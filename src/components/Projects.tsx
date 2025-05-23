@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { collection, getDocs, addDoc, doc, updateDoc, query, orderBy, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import { Project, ProjectPrompts, GlobalPrompts } from '../types';
+import { Project, ProjectPrompts, GlobalPrompts, GlobalSettings, ProjectSettings } from '../types';
 import { 
   PlusIcon, 
   FolderIcon, 
@@ -9,7 +9,8 @@ import {
   MapPinIcon, 
   ArrowLeftIcon,
   Cog6ToothIcon,
-  DocumentTextIcon
+  DocumentTextIcon,
+  InformationCircleIcon
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -26,7 +27,8 @@ const Projects: React.FC<ProjectsProps> = ({ onSelectProject, selectedProject })
   const [showProjectSettings, setShowProjectSettings] = useState(false);
   const [creating, setCreating] = useState(false);
   const [activeTab, setActiveTab] = useState<'list' | 'global-settings'>('list');
-  const [activeSettingsTab, setActiveSettingsTab] = useState<'details' | 'guidelines'>('details');
+  const [activeSettingsTab, setActiveSettingsTab] = useState<'details' | 'guidelines' | 'timing'>('details');
+  const [activeGlobalTab, setActiveGlobalTab] = useState<'guidelines' | 'timing'>('guidelines');
   
   const [newProject, setNewProject] = useState({
     name: '',
@@ -45,10 +47,21 @@ const Projects: React.FC<ProjectsProps> = ({ onSelectProject, selectedProject })
     outreachPrompt: '',
     followupPrompt: '',
   });
+  const [globalSettings, setGlobalSettings] = useState<GlobalSettings>({
+    followupDelayDays: 7,
+    maxFollowups: 3,
+  });
+  const [projectSettings, setProjectSettings] = useState<ProjectSettings>({
+    followupDelayDays: 7,
+    maxFollowups: 3,
+    projectId: '',
+    useGlobalSettings: true,
+  });
 
   useEffect(() => {
     loadProjects();
     loadGlobalPrompts();
+    loadGlobalSettings();
   }, []);
 
   const loadProjects = async () => {
@@ -96,6 +109,20 @@ const Projects: React.FC<ProjectsProps> = ({ onSelectProject, selectedProject })
     }
   };
 
+  const loadGlobalSettings = async () => {
+    try {
+      const docRef = doc(db, 'settings', 'global');
+      const docSnap = await getDoc(docRef);
+      
+      if (docSnap.exists()) {
+        setGlobalSettings(docSnap.data() as GlobalSettings);
+      }
+    } catch (error) {
+      console.error('Error loading global settings:', error);
+      toast.error('Failed to load global settings');
+    }
+  };
+
   const loadProjectPrompts = useCallback(async () => {
     if (!editingProject) return;
 
@@ -119,11 +146,28 @@ const Projects: React.FC<ProjectsProps> = ({ onSelectProject, selectedProject })
     }
   }, [editingProject]);
 
-  useEffect(() => {
-    if (editingProject && showProjectSettings) {
-      loadProjectPrompts();
+  const loadProjectSettings = useCallback(async () => {
+    if (!editingProject) return;
+
+    try {
+      const docRef = doc(db, 'settings', `project_${editingProject.id}`);
+      const docSnap = await getDoc(docRef);
+      
+      if (docSnap.exists()) {
+        setProjectSettings(docSnap.data() as ProjectSettings);
+      } else {
+        setProjectSettings({
+          followupDelayDays: globalSettings.followupDelayDays,
+          maxFollowups: globalSettings.maxFollowups,
+          projectId: editingProject.id,
+          useGlobalSettings: true,
+        });
+      }
+    } catch (error) {
+      console.error('Error loading project settings:', error);
+      toast.error('Failed to load project settings');
     }
-  }, [editingProject, showProjectSettings, loadProjectPrompts]);
+  }, [editingProject, globalSettings]);
 
   const createProject = async () => {
     if (!newProject.name.trim()) {
@@ -175,28 +219,48 @@ const Projects: React.FC<ProjectsProps> = ({ onSelectProject, selectedProject })
     }
   };
 
+  const saveGlobalPrompts = async () => {
+    setSaving(true);
+    try {
+      const docRef = doc(db, 'prompts', 'global');
+      await setDoc(docRef, globalPrompts);
+      toast.success('Global email guidelines saved successfully!');
+    } catch (error) {
+      console.error('Error saving global prompts:', error);
+      toast.error('Failed to save global email guidelines');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveGlobalSettings = async () => {
+    setSaving(true);
+    try {
+      const docRef = doc(db, 'settings', 'global');
+      await setDoc(docRef, globalSettings);
+      toast.success('Global timing settings saved successfully!');
+    } catch (error) {
+      console.error('Error saving global settings:', error);
+      toast.error('Failed to save global timing settings');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const saveProjectSettings = async () => {
     if (!editingProject) return;
 
     setSaving(true);
     try {
-      const projectRef = doc(db, 'projects', editingProject.id);
-      await updateDoc(projectRef, {
-        name: editingProject.name,
-        areaDescription: editingProject.areaDescription,
-        projectDetails: editingProject.projectDetails,
-        updatedAt: new Date(),
+      const docRef = doc(db, 'settings', `project_${editingProject.id}`);
+      await setDoc(docRef, {
+        ...projectSettings,
+        projectId: editingProject.id,
       });
-
-      // Update local projects list
-      setProjects(prev => prev.map(p => 
-        p.id === editingProject.id ? { ...editingProject, updatedAt: new Date() } : p
-      ));
-
-      toast.success('Project settings saved successfully!');
+      toast.success('Project timing settings saved successfully!');
     } catch (error) {
       console.error('Error saving project settings:', error);
-      toast.error('Failed to save project settings');
+      toast.error('Failed to save project timing settings');
     } finally {
       setSaving(false);
     }
@@ -221,19 +285,39 @@ const Projects: React.FC<ProjectsProps> = ({ onSelectProject, selectedProject })
     }
   };
 
-  const saveGlobalPrompts = async () => {
+  const saveProjectDetails = async () => {
+    if (!editingProject) return;
+
     setSaving(true);
     try {
-      const docRef = doc(db, 'prompts', 'global');
-      await setDoc(docRef, globalPrompts);
-      toast.success('Global email guidelines saved successfully!');
+      const projectRef = doc(db, 'projects', editingProject.id);
+      await updateDoc(projectRef, {
+        name: editingProject.name,
+        areaDescription: editingProject.areaDescription,
+        projectDetails: editingProject.projectDetails,
+        updatedAt: new Date(),
+      });
+
+      // Update local projects list
+      setProjects(prev => prev.map(p => 
+        p.id === editingProject.id ? { ...editingProject, updatedAt: new Date() } : p
+      ));
+
+      toast.success('Project details saved successfully!');
     } catch (error) {
-      console.error('Error saving global prompts:', error);
-      toast.error('Failed to save global email guidelines');
+      console.error('Error saving project details:', error);
+      toast.error('Failed to save project details');
     } finally {
       setSaving(false);
     }
   };
+
+  useEffect(() => {
+    if (editingProject && showProjectSettings) {
+      loadProjectPrompts();
+      loadProjectSettings();
+    }
+  }, [editingProject, showProjectSettings, loadProjectPrompts, loadProjectSettings]);
 
   const handleProjectSelect = (project: Project) => {
     setShowProjectSettings(true);
@@ -322,6 +406,17 @@ const Projects: React.FC<ProjectsProps> = ({ onSelectProject, selectedProject })
             >
               <DocumentTextIcon className="h-5 w-5 mr-2" />
               Email Guidelines
+            </button>
+            <button
+              onClick={() => setActiveSettingsTab('timing')}
+              className={`${
+                activeSettingsTab === 'timing'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              } whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm inline-flex items-center`}
+            >
+              <Cog6ToothIcon className="h-5 w-5 mr-2" />
+              Timing Settings
             </button>
           </nav>
         </div>
@@ -481,6 +576,123 @@ const Projects: React.FC<ProjectsProps> = ({ onSelectProject, selectedProject })
             </div>
           </div>
         )}
+
+        {/* Timing Settings Tab */}
+        {activeSettingsTab === 'timing' && (
+          <div className="space-y-6">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex">
+                <InformationCircleIcon className="h-5 w-5 text-blue-400 mt-0.5 mr-3 flex-shrink-0" />
+                <div>
+                  <h3 className="text-sm font-medium text-blue-800">Project Timing Settings</h3>
+                  <div className="mt-1 text-sm text-blue-700">
+                    <p>Configure follow-up timing for this project. You can use global defaults or customize timing specifically for this project.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center">
+                <input
+                  id="useGlobalSettings"
+                  type="checkbox"
+                  checked={projectSettings.useGlobalSettings}
+                  onChange={(e) => setProjectSettings(prev => ({ 
+                    ...prev, 
+                    useGlobalSettings: e.target.checked,
+                    followupDelayDays: e.target.checked ? globalSettings.followupDelayDays : prev.followupDelayDays,
+                    maxFollowups: e.target.checked ? globalSettings.maxFollowups : prev.maxFollowups,
+                  }))}
+                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                />
+                <label htmlFor="useGlobalSettings" className="ml-2 block text-sm text-gray-900">
+                  Use global timing settings
+                </label>
+              </div>
+
+              {!projectSettings.useGlobalSettings && (
+                <div className="space-y-4 pl-6 border-l-2 border-gray-200">
+                  <div>
+                    <label htmlFor="projectFollowupDelayDays" className="block text-sm font-medium text-gray-700">
+                      Follow-up Delay (Days)
+                    </label>
+                    <div className="mt-1">
+                      <input
+                        type="number"
+                        id="projectFollowupDelayDays"
+                        min="1"
+                        max="30"
+                        value={projectSettings.followupDelayDays}
+                        onChange={(e) => setProjectSettings(prev => ({ 
+                          ...prev, 
+                          followupDelayDays: parseInt(e.target.value) || 1 
+                        }))}
+                        className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                      />
+                    </div>
+                    <p className="mt-2 text-sm text-gray-500">
+                      Number of days to wait before sending a follow-up email for this project
+                    </p>
+                  </div>
+
+                  <div>
+                    <label htmlFor="projectMaxFollowups" className="block text-sm font-medium text-gray-700">
+                      Maximum Follow-ups
+                    </label>
+                    <div className="mt-1">
+                      <input
+                        type="number"
+                        id="projectMaxFollowups"
+                        min="1"
+                        max="10"
+                        value={projectSettings.maxFollowups}
+                        onChange={(e) => setProjectSettings(prev => ({ 
+                          ...prev, 
+                          maxFollowups: parseInt(e.target.value) || 1 
+                        }))}
+                        className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                      />
+                    </div>
+                    <p className="mt-2 text-sm text-gray-500">
+                      Maximum number of follow-up emails to send per lead for this project
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {projectSettings.useGlobalSettings && (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <h4 className="text-sm font-medium text-gray-900 mb-2">Current Global Settings</h4>
+                  <div className="text-sm text-gray-600 space-y-1">
+                    <p>• Follow-up Delay: {globalSettings.followupDelayDays} days</p>
+                    <p>• Maximum Follow-ups: {globalSettings.maxFollowups}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                onClick={saveProjectSettings}
+                disabled={saving}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saving ? 'Saving...' : 'Save Timing Settings'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="flex justify-end">
+          <button
+            onClick={saveProjectDetails}
+            disabled={saving}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {saving ? 'Saving...' : 'Save Project Details'}
+          </button>
+        </div>
       </div>
     );
   }
@@ -689,86 +901,185 @@ const Projects: React.FC<ProjectsProps> = ({ onSelectProject, selectedProject })
 
       {/* Global Project Settings Tab */}
       {activeTab === 'global-settings' && (
-        <div className="bg-white shadow rounded-lg">
-          <div className="px-4 py-5 sm:p-6">
-            <div className="flex justify-between items-start mb-6">
-              <div>
-                <h3 className="text-lg leading-6 font-medium text-gray-900">
-                  Global Email Guidelines
-                </h3>
-                <p className="text-sm text-gray-600 mt-1">
-                  Default AI instructions used across all projects unless overridden
-                </p>
-              </div>
-              <button
-                onClick={saveGlobalPrompts}
-                disabled={saving}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
-              >
-                {saving ? 'Saving...' : 'Save Global Guidelines'}
-              </button>
-            </div>
-
-            <div className="space-y-6">
-              <div>
-                <label htmlFor="globalOutreachPrompt" className="block text-sm font-medium text-gray-700 mb-2">
-                  Default Outreach Email Guidelines
-                </label>
-                <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-3">
-                  <p className="text-xs text-blue-700">
-                    <strong>AI Instructions for outreach emails:</strong> Tell the AI how to write initial outreach emails. 
-                    Include tone, style, key points to mention, and call-to-action guidelines.
-                  </p>
-                </div>
-                <textarea
-                  id="globalOutreachPrompt"
-                  rows={8}
-                  value={globalPrompts.outreachPrompt}
-                  onChange={(e) => setGlobalPrompts(prev => ({ ...prev, outreachPrompt: e.target.value }))}
-                  className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                  placeholder="Example: Write professional, personalized outreach emails. Keep them concise (under 150 words). Include a clear value proposition and specific call-to-action. Use a friendly but professional tone. Always personalize with the recipient's name and company."
-                  maxLength={300}
-                />
-                <p className="mt-1 text-sm text-gray-500">
-                  {globalPrompts.outreachPrompt.length}/300 characters
-                </p>
-              </div>
-
-              <div>
-                <label htmlFor="globalFollowupPrompt" className="block text-sm font-medium text-gray-700 mb-2">
-                  Default Follow-up Email Guidelines
-                </label>
-                <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-3">
-                  <p className="text-xs text-blue-700">
-                    <strong>AI Instructions for follow-up emails:</strong> Tell the AI how to write follow-up emails. 
-                    Include timing approach, how to reference previous emails, and value-add strategies.
-                  </p>
-                </div>
-                <textarea
-                  id="globalFollowupPrompt"
-                  rows={8}
-                  value={globalPrompts.followupPrompt}
-                  onChange={(e) => setGlobalPrompts(prev => ({ ...prev, followupPrompt: e.target.value }))}
-                  className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                  placeholder="Example: Write follow-up emails that add value. Reference the previous email briefly. Provide additional insights or resources. Keep tone persistent but not pushy. Include social proof or case studies when relevant."
-                  maxLength={300}
-                />
-                <p className="mt-1 text-sm text-gray-500">
-                  {globalPrompts.followupPrompt.length}/300 characters
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-6 bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <h4 className="text-sm font-medium text-gray-900 mb-2">How Global Guidelines Work</h4>
-              <ul className="text-sm text-gray-600 space-y-1">
-                <li>• These guidelines are used by default for all projects</li>
-                <li>• Individual projects can override these with custom guidelines in their settings</li>
-                <li>• Changes here affect all projects using global guidelines</li>
-                <li>• Keep guidelines clear and specific for best AI performance</li>
-              </ul>
-            </div>
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-lg font-medium text-gray-900">Global Project Settings</h3>
+            <p className="text-gray-600 mt-1">
+              Configure default settings that apply to all projects unless overridden
+            </p>
           </div>
+
+          {/* Global Settings Sub-tabs */}
+          <div className="border-b border-gray-200">
+            <nav className="-mb-px flex space-x-8">
+              <button
+                onClick={() => setActiveGlobalTab('guidelines')}
+                className={`${
+                  activeGlobalTab === 'guidelines'
+                    ? 'border-indigo-500 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm inline-flex items-center`}
+              >
+                <DocumentTextIcon className="h-5 w-5 mr-2" />
+                Email Guidelines
+              </button>
+              <button
+                onClick={() => setActiveGlobalTab('timing')}
+                className={`${
+                  activeGlobalTab === 'timing'
+                    ? 'border-indigo-500 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm inline-flex items-center`}
+              >
+                <Cog6ToothIcon className="h-5 w-5 mr-2" />
+                Timing Settings
+              </button>
+            </nav>
+          </div>
+
+          {/* Global Email Guidelines */}
+          {activeGlobalTab === 'guidelines' && (
+            <div className="space-y-6">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex">
+                  <InformationCircleIcon className="h-5 w-5 text-blue-400 mt-0.5 mr-3 flex-shrink-0" />
+                  <div>
+                    <h3 className="text-sm font-medium text-blue-800">Global Email Guidelines</h3>
+                    <div className="mt-1 text-sm text-blue-700">
+                      <p>These guidelines serve as AI prompts for generating outreach and follow-up emails. They apply to all projects unless overridden at the project level.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="globalOutreachPrompt" className="block text-sm font-medium text-gray-700">
+                    Outreach Email Guidelines
+                  </label>
+                  <div className="mt-1">
+                    <textarea
+                      id="globalOutreachPrompt"
+                      rows={6}
+                      maxLength={300}
+                      value={globalPrompts.outreachPrompt}
+                      onChange={(e) => setGlobalPrompts(prev => ({ ...prev, outreachPrompt: e.target.value }))}
+                      className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                      placeholder="Guidelines for AI to generate initial outreach emails..."
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {globalPrompts.outreachPrompt.length}/300 characters
+                  </p>
+                </div>
+
+                <div>
+                  <label htmlFor="globalFollowupPrompt" className="block text-sm font-medium text-gray-700">
+                    Follow-up Email Guidelines
+                  </label>
+                  <div className="mt-1">
+                    <textarea
+                      id="globalFollowupPrompt"
+                      rows={6}
+                      maxLength={300}
+                      value={globalPrompts.followupPrompt}
+                      onChange={(e) => setGlobalPrompts(prev => ({ ...prev, followupPrompt: e.target.value }))}
+                      className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                      placeholder="Guidelines for AI to generate follow-up emails..."
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {globalPrompts.followupPrompt.length}/300 characters
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  onClick={saveGlobalPrompts}
+                  disabled={saving}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {saving ? 'Saving...' : 'Save Global Guidelines'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Global Timing Settings */}
+          {activeGlobalTab === 'timing' && (
+            <div className="space-y-6">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex">
+                  <InformationCircleIcon className="h-5 w-5 text-blue-400 mt-0.5 mr-3 flex-shrink-0" />
+                  <div>
+                    <h3 className="text-sm font-medium text-blue-800">Global Timing Settings</h3>
+                    <div className="mt-1 text-sm text-blue-700">
+                      <p>Default timing settings for follow-up emails. These apply to all projects unless overridden at the project level.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="globalFollowupDelayDays" className="block text-sm font-medium text-gray-700">
+                    Follow-up Delay (Days)
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      type="number"
+                      id="globalFollowupDelayDays"
+                      min="1"
+                      max="30"
+                      value={globalSettings.followupDelayDays}
+                      onChange={(e) => setGlobalSettings(prev => ({ 
+                        ...prev, 
+                        followupDelayDays: parseInt(e.target.value) || 1 
+                      }))}
+                      className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                    />
+                  </div>
+                  <p className="mt-2 text-sm text-gray-500">
+                    Default number of days to wait before sending a follow-up email
+                  </p>
+                </div>
+
+                <div>
+                  <label htmlFor="globalMaxFollowups" className="block text-sm font-medium text-gray-700">
+                    Maximum Follow-ups
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      type="number"
+                      id="globalMaxFollowups"
+                      min="1"
+                      max="10"
+                      value={globalSettings.maxFollowups}
+                      onChange={(e) => setGlobalSettings(prev => ({ 
+                        ...prev, 
+                        maxFollowups: parseInt(e.target.value) || 1 
+                      }))}
+                      className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                    />
+                  </div>
+                  <p className="mt-2 text-sm text-gray-500">
+                    Default maximum number of follow-up emails to send per lead
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  onClick={saveGlobalSettings}
+                  disabled={saving}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {saving ? 'Saving...' : 'Save Global Settings'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

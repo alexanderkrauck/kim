@@ -42,6 +42,12 @@ export interface GlobalSettings {
   maxFollowups: number;
 }
 
+// Project-specific settings (can override global)
+export interface ProjectSettings extends GlobalSettings {
+  projectId: string;
+  useGlobalSettings: boolean;
+}
+
 export interface ApiKeys {
   openaiApiKey: string;
   apolloApiKey: string;

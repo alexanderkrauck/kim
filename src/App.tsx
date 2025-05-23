@@ -3,12 +3,12 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './components/Login';
 import Layout from './components/Layout';
-import Settings from './components/Settings';
 import Blacklist from './components/Blacklist';
-import ApiKeysComponent from './components/ApiKeys';
+import ApiKeysSettings from './components/ApiKeysSettings';
 import Projects from './components/Projects';
 import EnhancedLeads from './components/EnhancedLeads';
 import { Project } from './types';
+import { FolderIcon, UserGroupIcon, NoSymbolIcon, Cog6ToothIcon } from '@heroicons/react/24/outline';
 
 const Dashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState('projects');
@@ -32,10 +32,8 @@ const Dashboard: React.FC = () => {
         );
       case 'leads':
         return <EnhancedLeads selectedProject={selectedProject} />;
-      case 'settings':
-        return <Settings />;
       case 'apikeys':
-        return <ApiKeysComponent />;
+        return <ApiKeysSettings />;
       case 'blacklist':
         return <Blacklist />;
       default:
@@ -47,6 +45,13 @@ const Dashboard: React.FC = () => {
         );
     }
   };
+
+  const navigationItems = [
+    { id: 'projects', name: 'Projects', icon: FolderIcon },
+    { id: 'leads', name: 'Leads', icon: UserGroupIcon },
+    { id: 'blacklist', name: 'Global Blacklist', icon: NoSymbolIcon },
+    { id: 'apikeys', name: 'Settings', icon: Cog6ToothIcon },
+  ];
 
   return (
     <Layout activeTab={activeTab} onTabChange={setActiveTab}>

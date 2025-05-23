@@ -21,9 +21,8 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => 
   const navigation = [
     { name: 'Projects', id: 'projects', icon: FolderIcon },
     { name: 'Leads', id: 'leads', icon: UserGroupIcon },
-    { name: 'Settings', id: 'settings', icon: Cog6ToothIcon },
-    { name: 'API Keys', id: 'apikeys', icon: KeyIcon },
-    { name: 'Blacklist', id: 'blacklist', icon: NoSymbolIcon },
+    { name: 'Global Blacklist', id: 'blacklist', icon: NoSymbolIcon },
+    { name: 'Settings', id: 'apikeys', icon: KeyIcon },
   ];
 
   const handleLogout = async () => {

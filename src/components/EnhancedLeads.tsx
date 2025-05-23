@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, doc, updateDoc, query, where, orderBy, getDoc, setDoc } from 'firebase/firestore';
+import React, { useState, useEffect, useCallback } from 'react';
+import { collection, getDocs, addDoc, doc, updateDoc, query, where, getDoc, setDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { db, functions, auth } from '../firebase/config';
+import { db, functions } from '../firebase/config';
 import { Lead, Project, LeadImport } from '../types';
 import { 
   NoSymbolIcon, 
@@ -46,7 +46,7 @@ const EnhancedLeads: React.FC<EnhancedLeadsProps> = ({ selectedProject }) => {
     }
   }, [selectedProject, currentUser]);
 
-  const loadLeads = async () => {
+  const loadLeads = useCallback(async () => {
     if (!selectedProject) return;
     
     // Check authentication
@@ -147,7 +147,7 @@ const EnhancedLeads: React.FC<EnhancedLeadsProps> = ({ selectedProject }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedProject, currentUser, retryCount]);
 
   const addLead = async () => {
     if (!selectedProject) {

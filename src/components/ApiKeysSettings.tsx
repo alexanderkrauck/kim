@@ -4,8 +4,9 @@ import { db } from '../firebase/config';
 import { ApiKeys } from '../types';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { KeyIcon } from '@heroicons/react/24/outline';
 
-const ApiKeysComponent: React.FC = () => {
+const ApiKeysSettings: React.FC = () => {
   const [apiKeys, setApiKeys] = useState<ApiKeys>({
     openaiApiKey: '',
     apolloApiKey: '',
@@ -117,13 +118,15 @@ const ApiKeysComponent: React.FC = () => {
   return (
     <div className="bg-white shadow rounded-lg">
       <div className="px-4 py-5 sm:p-6">
-        <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-          API Keys Configuration
-        </h3>
-        <p className="text-sm text-gray-600 mb-6">
-          Configure your API keys for various services. These keys are stored securely and used globally across all projects.
-        </p>
-        
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 flex items-center">
+            <KeyIcon className="h-6 w-6 mr-2" />
+            Settings
+          </h2>
+          <p className="text-gray-600 mt-1">
+            Configure API keys and system settings
+          </p>
+        </div>
         <div className="space-y-6">
           {apiKeyFields.map((field) => (
             <div key={field.key}>
@@ -192,4 +195,4 @@ const ApiKeysComponent: React.FC = () => {
   );
 };
 
-export default ApiKeysComponent; 
+export default ApiKeysSettings; 
