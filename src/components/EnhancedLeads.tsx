@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, addDoc, doc, updateDoc, query, where, orderBy, getDoc, setDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { db, functions } from '../firebase/config';
+import { db, functions, auth } from '../firebase/config';
 import { Lead, Project, LeadImport } from '../types';
 import { 
   NoSymbolIcon, 
@@ -14,6 +14,7 @@ import {
   ChevronDownIcon
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { useAuth } from '../contexts/AuthContext';
 
 interface EnhancedLeadsProps {
   selectedProject: Project | null;
@@ -27,6 +28,8 @@ const EnhancedLeads: React.FC<EnhancedLeadsProps> = ({ selectedProject }) => {
   const [showDetailedView, setShowDetailedView] = useState(false);
   const [sortField, setSortField] = useState<keyof Lead>('createdAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [retryCount, setRetryCount] = useState(0);
+  const { currentUser } = useAuth();
   const [newLead, setNewLead] = useState<LeadImport>({
     email: '',
     name: '',
@@ -36,46 +39,110 @@ const EnhancedLeads: React.FC<EnhancedLeadsProps> = ({ selectedProject }) => {
   });
 
   useEffect(() => {
-    if (selectedProject) {
+    if (selectedProject && currentUser) {
+      setRetryCount(0);
       loadLeads();
     }
-  }, [selectedProject]);
+  }, [selectedProject, currentUser]);
 
   const loadLeads = async () => {
     if (!selectedProject) return;
+    
+    // Check authentication
+    if (!currentUser) {
+      console.error('User not authenticated');
+      toast.error('Please log in to view leads');
+      setLoading(false);
+      return;
+    }
 
+    setLoading(true);
     try {
+      console.log('Loading leads for project:', selectedProject.id);
+      console.log('Current user:', currentUser.uid);
+      
+      // First, try a simple query without orderBy to avoid index issues
       const q = query(
         collection(db, 'leads'), 
-        where('projectId', '==', selectedProject.id),
-        orderBy('createdAt', 'desc')
+        where('projectId', '==', selectedProject.id)
       );
+      
+      console.log('Executing Firestore query...');
       const querySnapshot = await getDocs(q);
+      console.log('Query successful, documents found:', querySnapshot.size);
       
       const leadsData: Lead[] = [];
       querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        leadsData.push({
-          id: doc.id,
-          email: data.email,
-          name: data.name || '',
-          company: data.company || '',
-          status: data.status,
-          lastContacted: data.lastContacted?.toDate() || null,
-          followupCount: data.followupCount || 0,
-          createdAt: data.createdAt?.toDate() || new Date(),
-          projectId: data.projectId,
-          interactionSummary: data.interactionSummary || '',
-          emailChain: data.emailChain || [],
-          source: data.source || '',
-          notes: data.notes || '',
-        });
+        try {
+          const data = doc.data();
+          console.log('Processing document:', doc.id, data);
+          
+          leadsData.push({
+            id: doc.id,
+            email: data.email || '',
+            name: data.name || '',
+            company: data.company || '',
+            status: data.status || 'new',
+            lastContacted: data.lastContacted?.toDate() || null,
+            followupCount: data.followupCount || 0,
+            createdAt: data.createdAt?.toDate() || new Date(),
+            projectId: data.projectId || selectedProject.id,
+            interactionSummary: data.interactionSummary || '',
+            emailChain: data.emailChain || [],
+            source: data.source || '',
+            notes: data.notes || '',
+          });
+        } catch (docError) {
+          console.error('Error processing document:', doc.id, docError);
+        }
       });
       
+      // Sort the data locally instead of in the query
+      leadsData.sort((a, b) => {
+        const aTime = a.createdAt?.getTime() || 0;
+        const bTime = b.createdAt?.getTime() || 0;
+        return bTime - aTime; // Descending order (newest first)
+      });
+      
+      console.log('Successfully loaded leads:', leadsData.length);
       setLeads(leadsData);
-    } catch (error) {
+      setRetryCount(0); // Reset retry count on success
+    } catch (error: any) {
       console.error('Error loading leads:', error);
-      toast.error('Failed to load leads');
+      
+      // Provide more specific error messages
+      let errorMessage = 'Failed to load leads';
+      let shouldRetry = false;
+      
+      if (error.code === 'permission-denied') {
+        errorMessage = 'Permission denied. Please check your authentication and Firestore rules.';
+      } else if (error.code === 'failed-precondition') {
+        errorMessage = 'Database index required. Please check the console for index creation instructions.';
+      } else if (error.code === 'unavailable') {
+        errorMessage = 'Database temporarily unavailable. Please try again.';
+        shouldRetry = true;
+      } else if (error.code === 'deadline-exceeded' || error.code === 'timeout') {
+        errorMessage = 'Request timed out. Please try again.';
+        shouldRetry = true;
+      } else if (error.message) {
+        errorMessage = `Failed to load leads: ${error.message}`;
+        shouldRetry = true;
+      }
+      
+      // Retry logic for transient errors
+      if (shouldRetry && retryCount < 3) {
+        console.log(`Retrying... Attempt ${retryCount + 1}/3`);
+        setRetryCount(prev => prev + 1);
+        setTimeout(() => {
+          loadLeads();
+        }, 1000 * (retryCount + 1)); // Exponential backoff
+        return;
+      }
+      
+      toast.error(errorMessage);
+      
+      // Set empty array so UI doesn't show loading state forever
+      setLeads([]);
     } finally {
       setLoading(false);
     }
@@ -302,10 +369,27 @@ const EnhancedLeads: React.FC<EnhancedLeadsProps> = ({ selectedProject }) => {
     );
   }
 
+  if (!currentUser) {
+    return (
+      <div className="text-center py-12">
+        <ExclamationTriangleIcon className="mx-auto h-12 w-12 text-gray-400" />
+        <h3 className="mt-2 text-sm font-medium text-gray-900">Authentication required</h3>
+        <p className="mt-1 text-sm text-gray-500">
+          Please log in to view and manage leads.
+        </p>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-500"></div>
+        {retryCount > 0 && (
+          <p className="ml-4 text-sm text-gray-600">
+            Retrying... ({retryCount}/3)
+          </p>
+        )}
       </div>
     );
   }
@@ -452,6 +536,19 @@ const EnhancedLeads: React.FC<EnhancedLeadsProps> = ({ selectedProject }) => {
               <p className="mt-1 text-sm text-gray-500">
                 Get started by adding your first lead to this project.
               </p>
+              {retryCount > 0 && (
+                <div className="mt-4">
+                  <button
+                    onClick={() => {
+                      setRetryCount(0);
+                      loadLeads();
+                    }}
+                    className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                  >
+                    Try Again
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
