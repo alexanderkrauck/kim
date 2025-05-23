@@ -1,0 +1,202 @@
+{
+  "timestamp": "2025-05-24T01:28:00.610530",
+  "summary": {
+    "total_tests": 80,
+    "successes": 34,
+    "failures": 4,
+    "errors": 40,
+    "skipped": 2,
+    "success_rate": 42.5,
+    "duration": 0.050923
+  },
+  "failures": [
+    {
+      "test": "test_test_all_apis_partial_success (tests.test_api_testing.TestApiTestingUtilities.test_test_all_apis_partial_success)",
+      "error": "'success' not found in ['partial', 'error']"
+    },
+    {
+      "test": "test_test_apollo_api_failure (tests.test_api_testing.TestApiTestingUtilities.test_test_apollo_api_failure)",
+      "error": "'success' != 'error'\n- success\n+ error\n"
+    },
+    {
+      "test": "test_get_api_keys_from_environment (tests.test_utils.TestFirebaseUtilities.test_get_api_keys_from_environment)",
+      "error": "'mock_apollo_key_123' != 'env_apollo_key'\n- mock_apollo_key_123\n+ env_apollo_key\n"
+    },
+    {
+      "test": "test_get_firestore_client (tests.test_utils.TestFirebaseUtilities.test_get_firestore_client)",
+      "error": "<tests.mocks.MockFirestoreClient object at 0x109f7dbb0> != <MagicMock name='client()' id='4462268768'>"
+    }
+  ],
+  "errors": [
+    {
+      "test": "test_find_leads_apollo_api_error (tests.test_find_leads.TestFindLeads.test_find_leads_apollo_api_error)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_find_leads_duplicate_filtering (tests.test_find_leads.TestFindLeads.test_find_leads_duplicate_filtering)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_find_leads_enrichment_failure_with_save_without_enrichment (tests.test_find_leads.TestFindLeads.test_find_leads_enrichment_failure_with_save_without_enrichment)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_find_leads_large_batch (tests.test_find_leads.TestFindLeads.test_find_leads_large_batch)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_find_leads_missing_apollo_api_key (tests.test_find_leads.TestFindLeads.test_find_leads_missing_apollo_api_key)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_find_leads_missing_project_id (tests.test_find_leads.TestFindLeads.test_find_leads_missing_project_id)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_find_leads_no_results_found (tests.test_find_leads.TestFindLeads.test_find_leads_no_results_found)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_find_leads_project_lead_count_update (tests.test_find_leads.TestFindLeads.test_find_leads_project_lead_count_update)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_find_leads_project_not_found (tests.test_find_leads.TestFindLeads.test_find_leads_project_not_found)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_find_leads_success_with_auto_enrich (tests.test_find_leads.TestFindLeads.test_find_leads_success_with_auto_enrich)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_find_leads_success_without_auto_enrich (tests.test_find_leads.TestFindLeads.test_find_leads_success_without_auto_enrich)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_find_leads_with_custom_search_params (tests.test_find_leads.TestFindLeads.test_find_leads_with_custom_search_params)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_enrich_leads_company_only (tests.test_enrich_leads.TestEnrichLeads.test_enrich_leads_company_only)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_enrich_leads_force_re_enrich (tests.test_enrich_leads.TestEnrichLeads.test_enrich_leads_force_re_enrich)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_enrich_leads_lead_belongs_to_different_project (tests.test_enrich_leads.TestEnrichLeads.test_enrich_leads_lead_belongs_to_different_project)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_enrich_leads_lead_not_found (tests.test_enrich_leads.TestEnrichLeads.test_enrich_leads_lead_not_found)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_enrich_leads_missing_perplexity_api_key (tests.test_enrich_leads.TestEnrichLeads.test_enrich_leads_missing_perplexity_api_key)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_enrich_leads_missing_project_id (tests.test_enrich_leads.TestEnrichLeads.test_enrich_leads_missing_project_id)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_enrich_leads_no_leads_to_enrich (tests.test_enrich_leads.TestEnrichLeads.test_enrich_leads_no_leads_to_enrich)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_enrich_leads_perplexity_api_error (tests.test_enrich_leads.TestEnrichLeads.test_enrich_leads_perplexity_api_error)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_enrich_leads_person_only (tests.test_enrich_leads.TestEnrichLeads.test_enrich_leads_person_only)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_enrich_leads_project_not_found (tests.test_enrich_leads.TestEnrichLeads.test_enrich_leads_project_not_found)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_enrich_leads_specific_leads (tests.test_enrich_leads.TestEnrichLeads.test_enrich_leads_specific_leads)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_enrich_leads_success_all_unenriched (tests.test_enrich_leads.TestEnrichLeads.test_enrich_leads_success_all_unenriched)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_get_enrichment_status_empty_project (tests.test_enrich_leads.TestGetEnrichmentStatus.test_get_enrichment_status_empty_project)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_get_enrichment_status_missing_project_id (tests.test_enrich_leads.TestGetEnrichmentStatus.test_get_enrichment_status_missing_project_id)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_get_enrichment_status_project_overview (tests.test_enrich_leads.TestGetEnrichmentStatus.test_get_enrichment_status_project_overview)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_get_enrichment_status_specific_leads (tests.test_enrich_leads.TestGetEnrichmentStatus.test_get_enrichment_status_specific_leads)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_test_apis_all_tests (tests.test_api_testing.TestApiTestingFunctions.test_test_apis_all_tests)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_test_apis_health_check (tests.test_api_testing.TestApiTestingFunctions.test_test_apis_health_check)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_test_apis_individual_tests (tests.test_api_testing.TestApiTestingFunctions.test_test_apis_individual_tests)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_test_apis_invalid_test_type (tests.test_api_testing.TestApiTestingFunctions.test_test_apis_invalid_test_type)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_test_apis_missing_api_keys (tests.test_api_testing.TestApiTestingFunctions.test_test_apis_missing_api_keys)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_test_apis_with_save_results (tests.test_api_testing.TestApiTestingFunctions.test_test_apis_with_save_results)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_test_apis_workflow_test (tests.test_api_testing.TestApiTestingFunctions.test_test_apis_workflow_test)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_get_api_status_basic (tests.test_api_testing.TestGetApiStatus.test_get_api_status_basic)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_get_api_status_with_recent_tests (tests.test_api_testing.TestGetApiStatus.test_get_api_status_with_recent_tests)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_validate_api_keys_custom_keys (tests.test_api_testing.TestValidateApiKeys.test_validate_api_keys_custom_keys)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_validate_api_keys_default (tests.test_api_testing.TestValidateApiKeys.test_validate_api_keys_default)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    },
+    {
+      "test": "test_validate_api_keys_invalid_formats (tests.test_api_testing.TestValidateApiKeys.test_validate_api_keys_invalid_formats)",
+      "error": "Working outside of request context.\n\nThis typically means that you attempted to use functionality that needed\nan active HTTP request. Consult the documentation on testing for\ninformation about how to avoid this problem."
+    }
+  ],
+  "skipped": [
+    {
+      "test": "test_data_sanitization (tests.test_utils.TestDataProcessing.test_data_sanitization)",
+      "reason": "Data sanitization functions not implemented yet"
+    },
+    {
+      "test": "test_email_validation (tests.test_utils.TestEmailUtilities.test_email_validation)",
+      "reason": "Email validation functions not implemented yet"
+    }
+  ]
+}
