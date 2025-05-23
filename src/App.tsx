@@ -15,9 +15,11 @@ const Dashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState('projects');
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
-  const handleSelectProject = (project: Project) => {
+  const handleSelectProject = (project: Project | null) => {
     setSelectedProject(project);
-    setActiveTab('leads'); // Automatically switch to leads when a project is selected
+    if (project) {
+      setActiveTab('leads'); // Automatically switch to leads when a project is selected
+    }
   };
 
   const renderContent = () => {

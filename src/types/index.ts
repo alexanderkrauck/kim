@@ -54,6 +54,9 @@ export interface Prompts {
   followupPrompt: string;
 }
 
+// Global prompts (default templates)
+export type GlobalPrompts = Prompts;
+
 // Project-specific prompts (can override global)
 export interface ProjectPrompts extends Prompts {
   projectId: string;
