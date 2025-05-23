@@ -2,7 +2,6 @@ import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   Cog6ToothIcon, 
-  DocumentTextIcon, 
   UserGroupIcon, 
   ArrowRightOnRectangleIcon,
   NoSymbolIcon,
@@ -24,7 +23,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => 
     { name: 'Leads', id: 'leads', icon: UserGroupIcon },
     { name: 'Settings', id: 'settings', icon: Cog6ToothIcon },
     { name: 'API Keys', id: 'apikeys', icon: KeyIcon },
-    { name: 'Prompts', id: 'prompts', icon: DocumentTextIcon },
     { name: 'Blacklist', id: 'blacklist', icon: NoSymbolIcon },
   ];
 

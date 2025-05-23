@@ -4,7 +4,6 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './components/Login';
 import Layout from './components/Layout';
 import Settings from './components/Settings';
-import Prompts from './components/Prompts';
 import Blacklist from './components/Blacklist';
 import ApiKeysComponent from './components/ApiKeys';
 import Projects from './components/Projects';
@@ -37,8 +36,6 @@ const Dashboard: React.FC = () => {
         return <Settings />;
       case 'apikeys':
         return <ApiKeysComponent />;
-      case 'prompts':
-        return <Prompts />;
       case 'blacklist':
         return <Blacklist />;
       default:
