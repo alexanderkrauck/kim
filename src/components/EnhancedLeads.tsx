@@ -11,7 +11,8 @@ import {
   ArrowDownTrayIcon,
   EyeIcon,
   ChevronUpIcon,
-  ChevronDownIcon
+  ChevronDownIcon,
+  CheckCircleIcon
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
@@ -238,10 +239,46 @@ const EnhancedLeads: React.FC<EnhancedLeadsProps> = ({ selectedProject }) => {
         lead.id === leadId ? { ...lead, status: 'blacklisted' as const } : lead
       ));
 
-      toast.success('Lead blacklisted successfully');
+      toast.success('Lead blacklisted for this project');
     } catch (error) {
       console.error('Error blacklisting lead:', error);
       toast.error('Failed to blacklist lead');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const unblacklistLead = async (leadId: string, email: string) => {
+    setActionLoading(leadId);
+    try {
+      // Update lead status back to 'new'
+      const leadRef = doc(db, 'leads', leadId);
+      await updateDoc(leadRef, { status: 'new' });
+
+      // Remove from project-specific blacklist
+      const blacklistRef = doc(db, 'blacklist', `project_${selectedProject?.id}`);
+      const blacklistDoc = await getDoc(blacklistRef);
+      
+      if (blacklistDoc.exists()) {
+        const blacklistData = blacklistDoc.data();
+        const currentList: string[] = blacklistData.list || [];
+        const updatedList = currentList.filter(blockedEmail => blockedEmail !== email.toLowerCase());
+        
+        await setDoc(blacklistRef, { 
+          list: updatedList,
+          projectId: selectedProject?.id 
+        });
+      }
+
+      // Update local state
+      setLeads(prev => prev.map(lead => 
+        lead.id === leadId ? { ...lead, status: 'new' as const } : lead
+      ));
+
+      toast.success('Lead un-blacklisted for this project');
+    } catch (error) {
+      console.error('Error un-blacklisting lead:', error);
+      toast.error('Failed to un-blacklist lead');
     } finally {
       setActionLoading(null);
     }
@@ -346,7 +383,7 @@ const EnhancedLeads: React.FC<EnhancedLeadsProps> = ({ selectedProject }) => {
       case 'bounced':
         return `${baseClasses} bg-red-100 text-red-800`;
       case 'blacklisted':
-        return `${baseClasses} bg-gray-100 text-gray-800`;
+        return `${baseClasses} bg-red-100 text-red-800`;
       default:
         return `${baseClasses} bg-gray-100 text-gray-800`;
     }
@@ -429,6 +466,21 @@ const EnhancedLeads: React.FC<EnhancedLeadsProps> = ({ selectedProject }) => {
             <PlusIcon className="h-4 w-4 mr-2" />
             Add Lead
           </button>
+        </div>
+      </div>
+
+      {/* Blacklist Information */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex">
+          <ExclamationTriangleIcon className="h-5 w-5 text-blue-400 mt-0.5 mr-3 flex-shrink-0" />
+          <div>
+            <h3 className="text-sm font-medium text-blue-800">Project Blacklisting</h3>
+            <div className="mt-1 text-sm text-blue-700">
+              <p>• <strong>Blacklist</strong>: Blocks leads from this project only</p>
+              <p>• <strong>Un-blacklist</strong>: Restores leads to active status in this project</p>
+              <p>• For permanent blocking across all projects, use the Global Blacklist tab</p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -645,6 +697,18 @@ const EnhancedLeads: React.FC<EnhancedLeadsProps> = ({ selectedProject }) => {
                               </button>
                             )}
                           </>
+                        )}
+                        
+                        {lead.status === 'blacklisted' && (
+                          <button
+                            onClick={() => unblacklistLead(lead.id, lead.email)}
+                            disabled={actionLoading === lead.id}
+                            className="text-green-600 hover:text-green-900 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center"
+                            title="Un-blacklist this lead"
+                          >
+                            <CheckCircleIcon className="h-4 w-4 mr-1" />
+                            Un-blacklist
+                          </button>
                         )}
                         
                         {actionLoading === lead.id && (
