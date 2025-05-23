@@ -13,6 +13,7 @@ import {
   InformationCircleIcon
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { useAuth } from '../contexts/AuthContext';
 
 interface ProjectsProps {
   onSelectProject: (project: Project | null) => void;
@@ -58,13 +59,24 @@ const Projects: React.FC<ProjectsProps> = ({ onSelectProject, selectedProject })
     useGlobalSettings: true,
   });
 
+  const auth = useAuth();
+
   useEffect(() => {
-    loadProjects();
-    loadGlobalPrompts();
-    loadGlobalSettings();
-  }, []);
+    if (auth.currentUser) {
+      loadProjects();
+      loadGlobalPrompts();
+      loadGlobalSettings();
+    }
+  }, [auth.currentUser]);
 
   const loadProjects = async () => {
+    if (!auth.currentUser) {
+      console.error('User not authenticated');
+      toast.error('Please log in to access projects');
+      setLoading(false);
+      return;
+    }
+
     try {
       const q = query(collection(db, 'projects'), orderBy('createdAt', 'desc'));
       const querySnapshot = await getDocs(q);

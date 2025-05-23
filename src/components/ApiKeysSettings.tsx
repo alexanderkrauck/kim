@@ -4,6 +4,7 @@ import { db } from '../firebase/config';
 import { ApiKeys, SmtpSettings } from '../types';
 import { EyeIcon, EyeSlashIcon, KeyIcon, EnvelopeIcon, ExclamationTriangleIcon, ShieldExclamationIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { useAuth } from '../contexts/AuthContext';
 
 const ApiKeysSettings: React.FC = () => {
   const [apiKeys, setApiKeys] = useState<ApiKeys>({
@@ -36,12 +37,23 @@ const ApiKeysSettings: React.FC = () => {
     smtpPassword: false,
   });
 
+  const auth = useAuth();
+
   useEffect(() => {
-    loadApiKeys();
-    loadSmtpSettings();
-  }, []);
+    if (auth.currentUser) {
+      loadApiKeys();
+      loadSmtpSettings();
+    }
+  }, [auth.currentUser]);
 
   const loadApiKeys = async () => {
+    if (!auth.currentUser) {
+      console.error('User not authenticated');
+      toast.error('Please log in to access API keys');
+      setLoading(false);
+      return;
+    }
+
     try {
       const docRef = doc(db, 'settings', 'apiKeys');
       const docSnap = await getDoc(docRef);
@@ -58,6 +70,12 @@ const ApiKeysSettings: React.FC = () => {
   };
 
   const loadSmtpSettings = async () => {
+    if (!auth.currentUser) {
+      console.error('User not authenticated');
+      toast.error('Please log in to access SMTP settings');
+      return;
+    }
+
     try {
       const docRef = doc(db, 'settings', 'smtp');
       const docSnap = await getDoc(docRef);
@@ -73,6 +91,11 @@ const ApiKeysSettings: React.FC = () => {
   };
 
   const saveApiKeys = async () => {
+    if (!auth.currentUser) {
+      toast.error('Please log in to save API keys');
+      return;
+    }
+
     setSaving(true);
     try {
       const docRef = doc(db, 'settings', 'apiKeys');
@@ -106,6 +129,11 @@ const ApiKeysSettings: React.FC = () => {
   };
 
   const confirmSaveSmtpSettings = async () => {
+    if (!auth.currentUser) {
+      toast.error('Please log in to save SMTP settings');
+      return;
+    }
+
     setSaving(true);
     setShowConfirmation(false);
     try {

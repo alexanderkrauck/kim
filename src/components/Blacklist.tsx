@@ -4,6 +4,7 @@ import { db } from '../firebase/config';
 import { BlacklistEmails } from '../types';
 import { TrashIcon, ExclamationTriangleIcon, GlobeAltIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { useAuth } from '../contexts/AuthContext';
 
 const Blacklist: React.FC = () => {
   const [blacklist, setBlacklist] = useState<BlacklistEmails>({ list: [] });
@@ -11,11 +12,22 @@ const Blacklist: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  const auth = useAuth();
+
   useEffect(() => {
-    loadBlacklist();
-  }, []);
+    if (auth.currentUser) {
+      loadBlacklist();
+    }
+  }, [auth.currentUser]);
 
   const loadBlacklist = async () => {
+    if (!auth.currentUser) {
+      console.error('User not authenticated');
+      toast.error('Please log in to access blacklist');
+      setLoading(false);
+      return;
+    }
+
     try {
       const docRef = doc(db, 'blacklist', 'emails');
       const docSnap = await getDoc(docRef);
