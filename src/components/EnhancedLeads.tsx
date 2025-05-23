@@ -39,13 +39,6 @@ const EnhancedLeads: React.FC<EnhancedLeadsProps> = ({ selectedProject }) => {
     notes: '',
   });
 
-  useEffect(() => {
-    if (selectedProject && currentUser) {
-      setRetryCount(0);
-      loadLeads();
-    }
-  }, [selectedProject, currentUser]);
-
   const loadLeads = useCallback(async () => {
     if (!selectedProject) return;
     
@@ -148,6 +141,13 @@ const EnhancedLeads: React.FC<EnhancedLeadsProps> = ({ selectedProject }) => {
       setLoading(false);
     }
   }, [selectedProject, currentUser, retryCount]);
+
+  useEffect(() => {
+    if (selectedProject && currentUser) {
+      setRetryCount(0);
+      loadLeads();
+    }
+  }, [selectedProject, currentUser, loadLeads]);
 
   const addLead = async () => {
     if (!selectedProject) {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { ApiKeys, SmtpSettings } from '../types';
@@ -39,14 +39,7 @@ const ApiKeysSettings: React.FC = () => {
 
   const auth = useAuth();
 
-  useEffect(() => {
-    if (auth.currentUser) {
-      loadApiKeys();
-      loadSmtpSettings();
-    }
-  }, [auth.currentUser]);
-
-  const loadApiKeys = async () => {
+  const loadApiKeys = useCallback(async () => {
     if (!auth.currentUser) {
       console.error('User not authenticated');
       toast.error('Please log in to access API keys');
@@ -67,9 +60,9 @@ const ApiKeysSettings: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [auth.currentUser]);
 
-  const loadSmtpSettings = async () => {
+  const loadSmtpSettings = useCallback(async () => {
     if (!auth.currentUser) {
       console.error('User not authenticated');
       toast.error('Please log in to access SMTP settings');
@@ -88,7 +81,14 @@ const ApiKeysSettings: React.FC = () => {
       console.error('Error loading SMTP settings:', error);
       toast.error('Failed to load SMTP settings');
     }
-  };
+  }, [auth.currentUser]);
+
+  useEffect(() => {
+    if (auth.currentUser) {
+      loadApiKeys();
+      loadSmtpSettings();
+    }
+  }, [auth.currentUser, loadApiKeys, loadSmtpSettings]);
 
   const saveApiKeys = async () => {
     if (!auth.currentUser) {
@@ -281,79 +281,79 @@ const ApiKeysSettings: React.FC = () => {
 
       {/* API Keys Tab */}
       {activeTab === 'api-keys' && (
-        <div className="bg-white shadow rounded-lg">
-          <div className="px-4 py-5 sm:p-6">
-            <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-              API Keys Configuration
-            </h3>
-            <p className="text-sm text-gray-600 mb-6">
-              Configure your API keys for various services. These keys are stored securely and used globally across all projects.
-            </p>
-            
-            <div className="space-y-6">
-              {apiKeyFields.map((field) => (
-                <div key={field.key}>
-                  <label htmlFor={field.key} className="block text-sm font-medium text-gray-700">
-                    {field.label}
-                  </label>
-                  <div className="mt-1 relative">
-                    <input
-                      type={showKeys[field.showKey] ? 'text' : 'password'}
-                      id={field.key}
-                      value={apiKeys[field.key]}
-                      onChange={(e) => handleInputChange(field.key, e.target.value)}
-                      className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full pr-10 sm:text-sm border-gray-300 rounded-md"
-                      placeholder={field.placeholder}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => toggleShowKey(field.showKey)}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                    >
-                      {showKeys[field.showKey] ? (
-                        <EyeSlashIcon className="h-4 w-4 text-gray-400" />
-                      ) : (
-                        <EyeIcon className="h-4 w-4 text-gray-400" />
-                      )}
-                    </button>
-                  </div>
-                  <p className="mt-2 text-sm text-gray-500">
-                    {field.description}
-                    {apiKeys[field.key] && !showKeys[field.showKey] && (
-                      <span className="ml-2 text-green-600">
-                        ✓ Key configured: {maskKey(apiKeys[field.key])}
-                      </span>
-                    )}
-                  </p>
-                </div>
-              ))}
+    <div className="bg-white shadow rounded-lg">
+      <div className="px-4 py-5 sm:p-6">
+        <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
+          API Keys Configuration
+        </h3>
+        <p className="text-sm text-gray-600 mb-6">
+          Configure your API keys for various services. These keys are stored securely and used globally across all projects.
+        </p>
+        
+        <div className="space-y-6">
+          {apiKeyFields.map((field) => (
+            <div key={field.key}>
+              <label htmlFor={field.key} className="block text-sm font-medium text-gray-700">
+                {field.label}
+              </label>
+              <div className="mt-1 relative">
+                <input
+                  type={showKeys[field.showKey] ? 'text' : 'password'}
+                  id={field.key}
+                  value={apiKeys[field.key]}
+                  onChange={(e) => handleInputChange(field.key, e.target.value)}
+                  className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full pr-10 sm:text-sm border-gray-300 rounded-md"
+                  placeholder={field.placeholder}
+                />
+                <button
+                  type="button"
+                  onClick={() => toggleShowKey(field.showKey)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                >
+                  {showKeys[field.showKey] ? (
+                    <EyeSlashIcon className="h-4 w-4 text-gray-400" />
+                  ) : (
+                    <EyeIcon className="h-4 w-4 text-gray-400" />
+                  )}
+                </button>
+              </div>
+              <p className="mt-2 text-sm text-gray-500">
+                {field.description}
+                {apiKeys[field.key] && !showKeys[field.showKey] && (
+                  <span className="ml-2 text-green-600">
+                    ✓ Key configured: {maskKey(apiKeys[field.key])}
+                  </span>
+                )}
+              </p>
             </div>
+          ))}
+        </div>
 
-            <div className="mt-6">
-              <button
-                onClick={saveApiKeys}
-                disabled={saving}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {saving ? 'Saving...' : 'Save API Keys'}
-              </button>
-            </div>
+        <div className="mt-6">
+          <button
+            onClick={saveApiKeys}
+            disabled={saving}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {saving ? 'Saving...' : 'Save API Keys'}
+          </button>
+        </div>
 
-            <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-              <div className="flex">
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-yellow-800">
-                    Security Notice
-                  </h3>
-                  <div className="mt-2 text-sm text-yellow-700">
-                    <p>
-                      API keys are stored securely in your Firebase project. Never share these keys publicly or commit them to version control.
-                    </p>
-                  </div>
-                </div>
+        <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+          <div className="flex">
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-yellow-800">
+                Security Notice
+              </h3>
+              <div className="mt-2 text-sm text-yellow-700">
+                <p>
+                  API keys are stored securely in your Firebase project. Never share these keys publicly or commit them to version control.
+                </p>
               </div>
             </div>
           </div>
+        </div>
+      </div>
         </div>
       )}
 

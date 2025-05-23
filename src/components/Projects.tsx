@@ -61,15 +61,7 @@ const Projects: React.FC<ProjectsProps> = ({ onSelectProject, selectedProject })
 
   const auth = useAuth();
 
-  useEffect(() => {
-    if (auth.currentUser) {
-      loadProjects();
-      loadGlobalPrompts();
-      loadGlobalSettings();
-    }
-  }, [auth.currentUser]);
-
-  const loadProjects = async () => {
+  const loadProjects = useCallback(async () => {
     if (!auth.currentUser) {
       console.error('User not authenticated');
       toast.error('Please log in to access projects');
@@ -105,9 +97,9 @@ const Projects: React.FC<ProjectsProps> = ({ onSelectProject, selectedProject })
     } finally {
       setLoading(false);
     }
-  };
+  }, [auth.currentUser]);
 
-  const loadGlobalPrompts = async () => {
+  const loadGlobalPrompts = useCallback(async () => {
     try {
       const docRef = doc(db, 'prompts', 'global');
       const docSnap = await getDoc(docRef);
@@ -119,9 +111,9 @@ const Projects: React.FC<ProjectsProps> = ({ onSelectProject, selectedProject })
       console.error('Error loading global prompts:', error);
       toast.error('Failed to load global prompts');
     }
-  };
+  }, []);
 
-  const loadGlobalSettings = async () => {
+  const loadGlobalSettings = useCallback(async () => {
     try {
       const docRef = doc(db, 'settings', 'global');
       const docSnap = await getDoc(docRef);
@@ -133,7 +125,15 @@ const Projects: React.FC<ProjectsProps> = ({ onSelectProject, selectedProject })
       console.error('Error loading global settings:', error);
       toast.error('Failed to load global settings');
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (auth.currentUser) {
+      loadProjects();
+      loadGlobalPrompts();
+      loadGlobalSettings();
+    }
+  }, [auth.currentUser, loadProjects, loadGlobalPrompts, loadGlobalSettings]);
 
   const loadProjectPrompts = useCallback(async () => {
     if (!editingProject) return;

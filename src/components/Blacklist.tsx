@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { BlacklistEmails } from '../types';
@@ -14,13 +14,7 @@ const Blacklist: React.FC = () => {
 
   const auth = useAuth();
 
-  useEffect(() => {
-    if (auth.currentUser) {
-      loadBlacklist();
-    }
-  }, [auth.currentUser]);
-
-  const loadBlacklist = async () => {
+  const loadBlacklist = useCallback(async () => {
     if (!auth.currentUser) {
       console.error('User not authenticated');
       toast.error('Please log in to access blacklist');
@@ -41,7 +35,13 @@ const Blacklist: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [auth.currentUser]);
+
+  useEffect(() => {
+    if (auth.currentUser) {
+      loadBlacklist();
+    }
+  }, [auth.currentUser, loadBlacklist]);
 
   const saveBlacklist = async (updatedList: string[]) => {
     setSaving(true);

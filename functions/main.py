@@ -7,8 +7,15 @@ from firebase_admin import initialize_app, firestore
 from datetime import datetime, timedelta
 import logging
 
+# Import new functions
+from find_leads import find_leads
+from contact_leads import contact_leads
+
 # Initialize Firebase Admin
 initialize_app()
+
+# Export the new functions
+__all__ = ['find_leads', 'contact_leads', 'trigger_followup', 'process_all_followups', 'on_lead_created', 'health_check']
 
 @https_fn.on_call()
 def trigger_followup(req: https_fn.CallableRequest) -> dict:
