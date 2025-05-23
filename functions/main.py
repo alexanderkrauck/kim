@@ -10,12 +10,26 @@ import logging
 # Import new functions
 from find_leads import find_leads
 from contact_leads import contact_leads
+from enrich_leads import enrich_leads, get_enrichment_status
+from test_apis import test_apis, validate_api_keys, get_api_status
 
 # Initialize Firebase Admin
 initialize_app()
 
 # Export the new functions
-__all__ = ['find_leads', 'contact_leads', 'trigger_followup', 'process_all_followups', 'on_lead_created', 'health_check']
+__all__ = [
+    'find_leads', 
+    'contact_leads', 
+    'enrich_leads',
+    'get_enrichment_status',
+    'test_apis',
+    'validate_api_keys',
+    'get_api_status',
+    'trigger_followup', 
+    'process_all_followups', 
+    'on_lead_created', 
+    'health_check'
+]
 
 @https_fn.on_call()
 def trigger_followup(req: https_fn.CallableRequest) -> dict:

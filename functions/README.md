@@ -5,8 +5,10 @@ This directory contains the Firebase Functions backend for the automated outreac
 ## Architecture
 
 ### Core Functions
-- `find_leads.py` - Apollo.io integration for lead discovery and Perplexity enrichment
+- `find_leads.py` - Apollo.io integration for lead discovery
+- `enrich_leads.py` - Perplexity integration for lead enrichment and research
 - `contact_leads.py` - Email outreach and follow-up automation
+- `test_apis.py` - Production API testing and monitoring functions
 - `main.py` - Additional utility functions and Firebase triggers
 
 ### Utilities (`utils/`)
@@ -88,11 +90,33 @@ python setup_dev.py test
 
 ### `find_leads`
 ```python
-# Find and enrich leads for a project
+# Find leads for a project using Apollo.io
 {
     "project_id": "string",
     "num_leads": 25,  # optional
-    "search_params": {}  # optional
+    "search_params": {},  # optional
+    "auto_enrich": true,  # optional - automatically trigger enrichment
+    "save_without_enrichment": true  # optional - save leads even if enrichment fails
+}
+```
+
+### `enrich_leads`
+```python
+# Enrich existing leads with Perplexity research
+{
+    "project_id": "string",
+    "lead_ids": [],  # optional - specific leads to enrich
+    "force_re_enrich": false,  # optional - re-enrich already enriched leads
+    "enrichment_type": "both"  # optional - 'company', 'person', or 'both'
+}
+```
+
+### `get_enrichment_status`
+```python
+# Get enrichment status for a project or specific leads
+{
+    "project_id": "string",
+    "lead_ids": []  # optional - specific leads to check
 }
 ```
 
@@ -107,12 +131,22 @@ python setup_dev.py test
 }
 ```
 
+### `test_apis`
+```python
+# Test API connectivity and health
+{
+    "test_type": "health",  # 'health', 'individual', 'workflow', 'all'
+    "minimal": true,  # optional - use minimal requests to save credits
+    "save_results": false  # optional - save test results to Firestore
+}
+```
+
 ## Data Flow
 
-1. **Lead Discovery**: Apollo.io search → Lead processing → Duplicate filtering
-2. **Enrichment**: Perplexity research → Company insights → Data enhancement
-3. **Storage**: Firestore batch write → Project updates → Lead tracking
-4. **Outreach**: Lead eligibility → Email generation → SMTP delivery → Status updates
+1. **Lead Discovery**: Apollo.io search → Lead processing → Duplicate filtering → Save to Firestore
+2. **Lead Enrichment**: Perplexity research → Company insights → Person research → Data enhancement → Update Firestore
+3. **Email Generation**: Lead eligibility → Email generation → SMTP delivery → Status updates
+4. **Monitoring**: API health checks → Error tracking → Performance monitoring
 
 ## Security
 
