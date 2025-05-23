@@ -68,6 +68,8 @@ node_modules/
 .env.development.local
 .env.test.local
 .env.production.local
+# Allow env.example template files to be committed while keeping other .env files ignored
+!env.example
 
 # dataconnect generated files
 .dataconnect

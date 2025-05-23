@@ -14,7 +14,7 @@ class ApolloClient:
     
     def __init__(self, api_key: str):
         self.api_key = api_key
-        self.base_url = "https://api.apollo.io/v1"
+        self.base_url = "https://api.apollo.io/api/v1"
         self.headers = {
             "Cache-Control": "no-cache",
             "Content-Type": "application/json",
@@ -26,7 +26,8 @@ class ApolloClient:
                      job_titles: List[str] = None,
                      locations: List[str] = None,
                      page: int = 1,
-                     per_page: int = 25) -> Dict[str, Any]:
+                     per_page: int = 25,
+                     **kwargs) -> Dict[str, Any]:
         """
         Search for people using Apollo.io API
         
@@ -36,6 +37,7 @@ class ApolloClient:
             locations: List of locations to search in
             page: Page number for pagination
             per_page: Number of results per page
+            **kwargs: Additional search parameters
             
         Returns:
             Dict containing search results
@@ -53,6 +55,9 @@ class ApolloClient:
             payload["person_titles"] = job_titles
         if locations:
             payload["person_locations"] = locations
+        
+        # Add any additional parameters
+        payload.update(kwargs)
             
         try:
             response = requests.post(url, json=payload, headers=self.headers)
@@ -73,6 +78,24 @@ class ApolloClient:
         except requests.exceptions.RequestException as e:
             logging.error(f"Apollo API error getting person details: {e}")
             raise
+    
+    def test_api_access(self) -> Dict[str, Any]:
+        """Test API access and return account information"""
+        # Try to get users list as a simple test
+        url = f"{self.base_url}/users"
+        
+        try:
+            response = requests.get(url, headers=self.headers)
+            if response.status_code == 200:
+                return {"status": "success", "data": response.json()}
+            else:
+                return {
+                    "status": "error", 
+                    "code": response.status_code,
+                    "message": response.text
+                }
+        except requests.exceptions.RequestException as e:
+            return {"status": "error", "message": str(e)}
 
 
 class PerplexityClient:
