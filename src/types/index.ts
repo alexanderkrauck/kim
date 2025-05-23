@@ -55,6 +55,17 @@ export interface ApiKeys {
   perplexityApiKey: string;
 }
 
+export interface SmtpSettings {
+  host: string;
+  port: number;
+  secure: boolean; // true for 465, false for other ports
+  username: string;
+  password: string;
+  fromEmail: string;
+  fromName: string;
+  replyToEmail?: string;
+}
+
 export interface Prompts {
   outreachPrompt: string;
   followupPrompt: string;

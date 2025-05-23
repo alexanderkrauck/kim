@@ -35,8 +35,16 @@ A comprehensive Firebase-hosted admin dashboard for managing automated outreach 
 - **Easy Management**: Add/remove emails with validation
 
 ### ⚙️ **Settings**
-- **Global Configuration**: Follow-up delays and maximum follow-up attempts
-- **User Preferences**: Customizable dashboard settings
+- **Critical System Warning**: Prominent warning about the impact of configuration changes
+- **API Keys**: OpenAI, Apollo, Apifi, Perplexity configuration
+- **SMTP Email Settings**: Complete SMTP server configuration for outreach emails
+  - Server settings (host, port, SSL/TLS encryption)
+  - Authentication (username, password)
+  - Email configuration (from email, from name, reply-to)
+  - Support for major providers (Gmail, Outlook, Yahoo, SendGrid)
+  - **Safety Features**: Confirmation dialogs and change tracking for SMTP settings
+  - **Reset Functionality**: Ability to revert unsaved SMTP changes
+- **Global Timing Settings**: Follow-up delays and maximum follow-up attempts (moved to Projects tab)
 
 ## 🏗️ Architecture
 
@@ -46,11 +54,10 @@ A comprehensive Firebase-hosted admin dashboard for managing automated outreach 
 - Clear separation between global settings and project-specific configuration
 
 ### **Smart Navigation**
-- **Projects Tab**: Create, edit, and manage projects
+- **Projects Tab**: Create, edit, and manage projects with global timing settings
 - **Leads Tab**: Manage leads for selected project
-- **Prompts Tab**: Configure global AI templates
-- **API Keys Tab**: Manage service API keys
-- **Settings Tab**: Global dashboard configuration
+- **Global Blacklist Tab**: Manage globally blocked email addresses
+- **Settings Tab**: Configure API keys and SMTP email settings
 
 ### **Data Flow**
 1. Create projects with detailed configuration
@@ -150,6 +157,20 @@ interface Lead {
   emailChain: EmailRecord[];
   source?: string;
   notes?: string;
+}
+```
+
+### SMTP Settings
+```typescript
+interface SmtpSettings {
+  host: string;
+  port: number;
+  secure: boolean; // true for 465, false for other ports
+  username: string;
+  password: string;
+  fromEmail: string;
+  fromName: string;
+  replyToEmail?: string;
 }
 ```
 

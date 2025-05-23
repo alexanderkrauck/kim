@@ -8,7 +8,6 @@ import ApiKeysSettings from './components/ApiKeysSettings';
 import Projects from './components/Projects';
 import EnhancedLeads from './components/EnhancedLeads';
 import { Project } from './types';
-import { FolderIcon, UserGroupIcon, NoSymbolIcon, Cog6ToothIcon } from '@heroicons/react/24/outline';
 
 const Dashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState('projects');
@@ -45,13 +44,6 @@ const Dashboard: React.FC = () => {
         );
     }
   };
-
-  const navigationItems = [
-    { id: 'projects', name: 'Projects', icon: FolderIcon },
-    { id: 'leads', name: 'Leads', icon: UserGroupIcon },
-    { id: 'blacklist', name: 'Global Blacklist', icon: NoSymbolIcon },
-    { id: 'apikeys', name: 'Settings', icon: Cog6ToothIcon },
-  ];
 
   return (
     <Layout activeTab={activeTab} onTabChange={setActiveTab}>
