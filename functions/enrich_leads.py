@@ -19,27 +19,27 @@ from utils import (
 )
 
 
-@https_fn.on_call()
-def enrich_leads(req: https_fn.CallableRequest) -> Dict[str, Any]:
+def enrich_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Dict[str, Any]:
     """
-    Enrich existing leads with additional research and data
+    Business logic for enriching leads - separated from Firebase Functions decorator
     
     Args:
-        req.data should contain:
+        request_data: Dictionary containing:
         - project_id (str): ID of the project
         - lead_ids (list, optional): Specific lead IDs to enrich (if not provided, enriches all unenriched leads)
         - force_re_enrich (bool, optional): Re-enrich leads that already have enrichment data (default: False)
         - enrichment_type (str, optional): Type of enrichment ('company', 'person', 'both') (default: 'both')
+        auth_uid: User ID from Firebase Auth (optional)
         
     Returns:
         Dict with success status, message, and enrichment results
     """
     try:
         # Extract parameters from request
-        project_id = req.data.get('project_id')
-        lead_ids = req.data.get('lead_ids', [])
-        force_re_enrich = req.data.get('force_re_enrich', False)
-        enrichment_type = req.data.get('enrichment_type', 'both')
+        project_id = request_data.get('project_id')
+        lead_ids = request_data.get('lead_ids', [])
+        force_re_enrich = request_data.get('force_re_enrich', False)
+        enrichment_type = request_data.get('enrichment_type', 'both')
         
         if not project_id:
             raise ValueError("project_id is required")
@@ -209,28 +209,64 @@ def enrich_leads(req: https_fn.CallableRequest) -> Dict[str, Any]:
         
     except Exception as e:
         logging.error(f"Error in enrich_leads: {str(e)}")
+        return {
+            'success': False,
+            'error': str(e),
+            'error_type': type(e).__name__
+        }
+
+
+@https_fn.on_call()
+def enrich_leads(req: https_fn.CallableRequest) -> Dict[str, Any]:
+    """
+    Firebase Functions wrapper for enriching leads
+    
+    Args:
+        req: Firebase Functions CallableRequest
+        
+    Returns:
+        Dict with success status, message, and enrichment results
+    """
+    try:
+        auth_uid = req.auth.uid if req.auth else None
+        result = enrich_leads_logic(req.data, auth_uid)
+        
+        # If there was an error in business logic, convert to HttpsError
+        if not result.get('success', True):
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.INTERNAL,
+                message=result.get('error', 'Unknown error')
+            )
+        
+        return result
+        
+    except https_fn.HttpsError:
+        # Re-raise HttpsError as-is
+        raise
+    except Exception as e:
+        logging.error(f"Error in enrich_leads Firebase Function: {str(e)}")
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.INTERNAL,
             message=f"Failed to enrich leads: {str(e)}"
         )
 
 
-@https_fn.on_call()
-def get_enrichment_status(req: https_fn.CallableRequest) -> Dict[str, Any]:
+def get_enrichment_status_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Dict[str, Any]:
     """
-    Get enrichment status for a project or specific leads
+    Business logic for getting enrichment status - separated from Firebase Functions decorator
     
     Args:
-        req.data should contain:
+        request_data: Dictionary containing:
         - project_id (str): ID of the project
         - lead_ids (list, optional): Specific lead IDs to check
+        auth_uid: User ID from Firebase Auth (optional)
         
     Returns:
         Dict with enrichment status information
     """
     try:
-        project_id = req.data.get('project_id')
-        lead_ids = req.data.get('lead_ids', [])
+        project_id = request_data.get('project_id')
+        lead_ids = request_data.get('lead_ids', [])
         
         if not project_id:
             raise ValueError("project_id is required")
@@ -293,6 +329,42 @@ def get_enrichment_status(req: https_fn.CallableRequest) -> Dict[str, Any]:
         
     except Exception as e:
         logging.error(f"Error in get_enrichment_status: {str(e)}")
+        return {
+            'success': False,
+            'error': str(e),
+            'error_type': type(e).__name__
+        }
+
+
+@https_fn.on_call()
+def get_enrichment_status(req: https_fn.CallableRequest) -> Dict[str, Any]:
+    """
+    Firebase Functions wrapper for getting enrichment status
+    
+    Args:
+        req: Firebase Functions CallableRequest
+        
+    Returns:
+        Dict with enrichment status information
+    """
+    try:
+        auth_uid = req.auth.uid if req.auth else None
+        result = get_enrichment_status_logic(req.data, auth_uid)
+        
+        # If there was an error in business logic, convert to HttpsError
+        if not result.get('success', True):
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.INTERNAL,
+                message=result.get('error', 'Unknown error')
+            )
+        
+        return result
+        
+    except https_fn.HttpsError:
+        # Re-raise HttpsError as-is
+        raise
+    except Exception as e:
+        logging.error(f"Error in get_enrichment_status Firebase Function: {str(e)}")
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.INTERNAL,
             message=f"Failed to get enrichment status: {str(e)}"

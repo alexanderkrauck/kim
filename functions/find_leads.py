@@ -19,29 +19,29 @@ from utils import (
 )
 
 
-@https_fn.on_call()
-def find_leads(req: https_fn.CallableRequest) -> Dict[str, Any]:
+def find_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Dict[str, Any]:
     """
-    Find leads for a specific project using Apollo.io
+    Business logic for finding leads - separated from Firebase Functions decorator
     
     Args:
-        req.data should contain:
+        request_data: Dictionary containing:
         - project_id (str): ID of the project
         - num_leads (int, optional): Number of leads to find (default: 25)
         - search_params (dict, optional): Custom search parameters
         - auto_enrich (bool, optional): Automatically trigger enrichment after finding leads (default: True)
         - save_without_enrichment (bool, optional): Save leads even if enrichment fails (default: True)
+        auth_uid: User ID from Firebase Auth (optional)
         
     Returns:
         Dict with success status, message, and lead data
     """
     try:
         # Extract parameters from request
-        project_id = req.data.get('project_id')
-        num_leads = req.data.get('num_leads', 25)
-        search_params = req.data.get('search_params', {})
-        auto_enrich = req.data.get('auto_enrich', True)
-        save_without_enrichment = req.data.get('save_without_enrichment', True)
+        project_id = request_data.get('project_id')
+        num_leads = request_data.get('num_leads', 25)
+        search_params = request_data.get('search_params', {})
+        auto_enrich = request_data.get('auto_enrich', True)
+        save_without_enrichment = request_data.get('save_without_enrichment', True)
         
         if not project_id:
             raise ValueError("project_id is required")
@@ -145,19 +145,17 @@ def find_leads(req: https_fn.CallableRequest) -> Dict[str, Any]:
             if auto_enrich and api_keys.get('perplexity'):
                 try:
                     # Import here to avoid circular imports
-                    from enrich_leads import enrich_leads
+                    from enrich_leads import enrich_leads_logic
                     
-                    # Create enrichment request
-                    enrichment_req = type('obj', (object,), {
-                        'data': {
-                            'project_id': project_id,
-                            'lead_ids': saved_lead_ids,
-                            'enrichment_type': 'both'
-                        }
-                    })
+                    # Create enrichment request data
+                    enrichment_data = {
+                        'project_id': project_id,
+                        'lead_ids': saved_lead_ids,
+                        'enrichment_type': 'both'
+                    }
                     
                     # Trigger enrichment
-                    enrichment_result = enrich_leads(enrichment_req)
+                    enrichment_result = enrich_leads_logic(enrichment_data, auth_uid)
                     enrichment_triggered = True
                     
                     logging.info(f"Enrichment triggered: {enrichment_result.get('message', 'Success')}")
@@ -186,6 +184,42 @@ def find_leads(req: https_fn.CallableRequest) -> Dict[str, Any]:
         
     except Exception as e:
         logging.error(f"Error in find_leads: {str(e)}")
+        return {
+            'success': False,
+            'error': str(e),
+            'error_type': type(e).__name__
+        }
+
+
+@https_fn.on_call()
+def find_leads(req: https_fn.CallableRequest) -> Dict[str, Any]:
+    """
+    Firebase Functions wrapper for finding leads
+    
+    Args:
+        req: Firebase Functions CallableRequest
+        
+    Returns:
+        Dict with success status, message, and lead data
+    """
+    try:
+        auth_uid = req.auth.uid if req.auth else None
+        result = find_leads_logic(req.data, auth_uid)
+        
+        # If there was an error in business logic, convert to HttpsError
+        if not result.get('success', True):
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.INTERNAL,
+                message=result.get('error', 'Unknown error')
+            )
+        
+        return result
+        
+    except https_fn.HttpsError:
+        # Re-raise HttpsError as-is
+        raise
+    except Exception as e:
+        logging.error(f"Error in find_leads Firebase Function: {str(e)}")
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.INTERNAL,
             message=f"Failed to find leads: {str(e)}"

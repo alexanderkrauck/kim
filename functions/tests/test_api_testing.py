@@ -13,11 +13,11 @@ import os
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tests.base_test import MockFirebaseFunctionsTestCase
+from tests.base_test import FirebaseFunctionsTestCase
 from test_apis import test_apis, validate_api_keys, get_api_status
 
 
-class TestApiTestingFunctions(MockFirebaseFunctionsTestCase):
+class TestApiTestingFunctions(FirebaseFunctionsTestCase):
     """Test cases for test_apis Firebase function"""
     
     def test_test_apis_health_check(self):
@@ -26,7 +26,11 @@ class TestApiTestingFunctions(MockFirebaseFunctionsTestCase):
             'test_type': 'health'
         }
         
-        result = self.simulate_firebase_function_call(test_apis, request_data)
+        # Create mock callable request
+        mock_request = self.create_callable_request(request_data)
+        
+        # Call the function directly
+        result = test_apis(mock_request)
         
         self.assert_successful_response(result)
         self.assertEqual(result['test_type'], 'health')
@@ -40,7 +44,8 @@ class TestApiTestingFunctions(MockFirebaseFunctionsTestCase):
             'minimal': True
         }
         
-        result = self.simulate_firebase_function_call(test_apis, request_data)
+        mock_request = self.create_callable_request(request_data)
+        result = test_apis(mock_request)
         
         self.assert_successful_response(result)
         self.assertEqual(result['test_type'], 'individual')
@@ -56,7 +61,8 @@ class TestApiTestingFunctions(MockFirebaseFunctionsTestCase):
             'test_type': 'workflow'
         }
         
-        result = self.simulate_firebase_function_call(test_apis, request_data)
+        mock_request = self.create_callable_request(request_data)
+        result = test_apis(mock_request)
         
         self.assert_successful_response(result)
         self.assertEqual(result['test_type'], 'workflow')
@@ -71,7 +77,8 @@ class TestApiTestingFunctions(MockFirebaseFunctionsTestCase):
             'save_results': False
         }
         
-        result = self.simulate_firebase_function_call(test_apis, request_data)
+        mock_request = self.create_callable_request(request_data)
+        result = test_apis(mock_request)
         
         self.assert_successful_response(result)
         self.assertEqual(result['test_type'], 'all')
@@ -85,25 +92,27 @@ class TestApiTestingFunctions(MockFirebaseFunctionsTestCase):
             'test_type': 'invalid_type'
         }
         
-        result = self.simulate_firebase_function_call(test_apis, request_data)
+        mock_request = self.create_callable_request(request_data)
+        
+        # This should return an error result, not raise an exception
+        result = test_apis(mock_request)
         
         self.assert_error_response(result)
-        self.assertIn('invalid', result.get('error', '').lower())
+        self.assertIn('invalid', result.get('message', '').lower())
     
     def test_test_apis_missing_api_keys(self):
         """Test handling of missing API keys"""
         # Remove all API keys from environment
-        with patch.dict(os.environ, {}, clear=True):
-            self.test_api_keys = {}
-            
+        with patch('test_apis.get_api_keys', return_value={}):
             request_data = {
                 'test_type': 'individual'
             }
             
-            result = self.simulate_firebase_function_call(test_apis, request_data)
+            mock_request = self.create_callable_request(request_data)
+            result = test_apis(mock_request)
             
             self.assert_error_response(result)
-            self.assertIn('api', result.get('error', '').lower())
+            self.assertIn('missing', result.get('message', '').lower())
     
     def test_test_apis_with_save_results(self):
         """Test saving results to Firestore"""
@@ -112,21 +121,23 @@ class TestApiTestingFunctions(MockFirebaseFunctionsTestCase):
             'save_results': True
         }
         
-        result = self.simulate_firebase_function_call(test_apis, request_data)
+        mock_request = self.create_callable_request(request_data)
+        result = test_apis(mock_request)
         
         self.assert_successful_response(result)
         # Check if save functionality was attempted
         self.assertIn('test_type', result)
 
 
-class TestValidateApiKeys(MockFirebaseFunctionsTestCase):
+class TestValidateApiKeys(FirebaseFunctionsTestCase):
     """Test cases for validate_api_keys function"""
     
     def test_validate_api_keys_default(self):
         """Test validation with default configured keys"""
         request_data = {}
         
-        result = self.simulate_firebase_function_call(validate_api_keys, request_data)
+        mock_request = self.create_callable_request(request_data)
+        result = validate_api_keys(mock_request)
         
         self.assert_successful_response(result)
         self.assertIn('validation_results', result)
@@ -150,7 +161,8 @@ class TestValidateApiKeys(MockFirebaseFunctionsTestCase):
             'api_keys': custom_keys
         }
         
-        result = self.simulate_firebase_function_call(validate_api_keys, request_data)
+        mock_request = self.create_callable_request(request_data)
+        result = validate_api_keys(mock_request)
         
         self.assert_successful_response(result)
         validation_results = result['validation_results']
@@ -171,7 +183,8 @@ class TestValidateApiKeys(MockFirebaseFunctionsTestCase):
             'api_keys': invalid_keys
         }
         
-        result = self.simulate_firebase_function_call(validate_api_keys, request_data)
+        mock_request = self.create_callable_request(request_data)
+        result = validate_api_keys(mock_request)
         
         self.assert_successful_response(result)
         validation_results = result['validation_results']
@@ -182,7 +195,7 @@ class TestValidateApiKeys(MockFirebaseFunctionsTestCase):
         self.assertIn('openai', validation_results)
 
 
-class TestGetApiStatus(MockFirebaseFunctionsTestCase):
+class TestGetApiStatus(FirebaseFunctionsTestCase):
     """Test cases for get_api_status function"""
     
     def test_get_api_status_basic(self):
@@ -191,7 +204,8 @@ class TestGetApiStatus(MockFirebaseFunctionsTestCase):
             'include_recent_tests': False
         }
         
-        result = self.simulate_firebase_function_call(get_api_status, request_data)
+        mock_request = self.create_callable_request(request_data)
+        result = get_api_status(mock_request)
         
         self.assert_successful_response(result)
         self.assertIn('current_health', result)
@@ -204,7 +218,8 @@ class TestGetApiStatus(MockFirebaseFunctionsTestCase):
             'limit': 5
         }
         
-        result = self.simulate_firebase_function_call(get_api_status, request_data)
+        mock_request = self.create_callable_request(request_data)
+        result = get_api_status(mock_request)
         
         self.assert_successful_response(result)
         self.assertIn('current_health', result)
