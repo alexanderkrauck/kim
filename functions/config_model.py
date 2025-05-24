@@ -34,6 +34,14 @@ class JobRole(Enum):
     HEAD_OF_ENGINEERING = "Head of Engineering"
     ENGINEERING_MANAGER = "Engineering Manager"
     TECHNICAL_DIRECTOR = "Technical Director"
+    # New default job roles as shown in the image
+    HUMAN_RESOURCES = "Human Resources"
+    OFFICE_MANAGER = "Office Manager"
+    SECRETARY = "Secretary"
+    ASSISTANT = "Assistant"
+    ASSISTANT_MANAGER = "Assistant Manager"
+    MANAGER = "Manager"
+    SOCIAL_MEDIA = "Social Media"
 
 
 @dataclass
@@ -113,7 +121,8 @@ class LocationConfig:
 class JobRoleConfig:
     """Job role configuration for lead finding"""
     target_roles: List[JobRole] = field(default_factory=lambda: [
-        JobRole.CEO, JobRole.CTO, JobRole.FOUNDER, JobRole.COFOUNDER
+        JobRole.HUMAN_RESOURCES, JobRole.OFFICE_MANAGER, JobRole.SECRETARY,
+        JobRole.ASSISTANT, JobRole.ASSISTANT_MANAGER, JobRole.MANAGER, JobRole.SOCIAL_MEDIA
     ])
     custom_roles: List[str] = field(default_factory=list)
     

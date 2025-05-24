@@ -49,9 +49,9 @@ class TestApolloClient(unittest.TestCase):
     def test_search_people_with_parameters(self):
         """Test people search with various parameters"""
         result = self.client.search_people(
-            job_titles=['CTO'],
-            locations=['San Francisco, CA'],
-            company_domains=['example.com'],
+            person_titles=['CTO'],
+            person_locations=['San Francisco, CA'],
+            organization_domains=['example.com'],
             per_page=3,
             page=2
         )

@@ -4,11 +4,13 @@ Contact Leads Function
 This function handles outreach and follow-up emails for leads in a project.
 """
 
-import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from firebase_functions import https_fn, options
 from firebase_admin import firestore
+from utils.logging_config import get_logger
+
+logger = get_logger(__file__)
 
 # Configure European region
 EUROPEAN_REGION = options.SupportedRegion.EUROPE_WEST1
@@ -50,7 +52,7 @@ def contact_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> D
         if not project_id:
             raise ValueError("project_id is required")
         
-        logging.info(f"Contacting leads for project: {project_id}, type: {email_type}")
+        logger.info(f"Contacting leads for project: {project_id}, type: {email_type}")
         
         # Get project details and settings
         db = get_firestore_client()
@@ -96,16 +98,16 @@ def contact_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> D
                     if lead_data.get('projectId') == project_id:
                         leads_to_contact.append(lead_data)
                     else:
-                        logging.warning(f"Lead {lead_id} does not belong to project {project_id}")
+                        logger.warning(f"Lead {lead_id} does not belong to project {project_id}")
                 else:
-                    logging.warning(f"Lead {lead_id} not found")
+                    logger.warning(f"Lead {lead_id} not found")
         else:
             # Find leads based on email type and criteria
             leads_to_contact = find_eligible_leads(
                 db, project_id, email_type, effective_config.scheduling
             )
         
-        logging.info(f"Found {len(leads_to_contact)} leads to contact")
+        logger.info(f"Found {len(leads_to_contact)} leads to contact")
         
         if not leads_to_contact:
             return {
@@ -124,9 +126,9 @@ def contact_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> D
             if lead.get('email', '').lower() not in blacklisted_emails:
                 eligible_leads.append(lead)
             else:
-                logging.info(f"Skipping blacklisted lead: {lead.get('email')}")
+                logger.info(f"Skipping blacklisted lead: {lead.get('email')}")
         
-        logging.info(f"After blacklist filter: {len(eligible_leads)} eligible leads")
+        logger.info(f"After blacklist filter: {len(eligible_leads)} eligible leads")
         
         # Generate emails for each lead
         emails_to_send = []
@@ -167,20 +169,20 @@ def contact_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> D
                 emails_to_send.append(email_record)
                 
             except Exception as e:
-                logging.error(f"Failed to generate email for lead {lead.get('email')}: {e}")
+                logger.error(f"Failed to generate email for lead {lead.get('email')}: {e}")
                 generation_errors.append({
                     'lead_email': lead.get('email'),
                     'error': str(e)
                 })
         
-        logging.info(f"Generated {len(emails_to_send)} emails")
+        logger.info(f"Generated {len(emails_to_send)} emails")
         
         # Send emails (unless dry_run)
         sent_count = 0
         failed_count = 0
         
         if dry_run:
-            logging.info("Dry run mode - emails not sent")
+            logger.info("Dry run mode - emails not sent")
             sent_count = len(emails_to_send)
         else:
             # Send emails
@@ -205,14 +207,14 @@ def contact_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> D
                         create_email_record(db, email_data, project_id)
                         
                         sent_count += 1
-                        logging.info(f"Email sent successfully to {email_data['to_email']}")
+                        logger.info(f"Email sent successfully to {email_data['to_email']}")
                     else:
                         failed_count += 1
-                        logging.error(f"Failed to send email to {email_data['to_email']}")
+                        logger.error(f"Failed to send email to {email_data['to_email']}")
                         
                 except Exception as e:
                     failed_count += 1
-                    logging.error(f"Error sending email to {email_data['to_email']}: {e}")
+                    logger.error(f"Error sending email to {email_data['to_email']}: {e}")
         
         # Return results
         result = {
@@ -228,11 +230,11 @@ def contact_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> D
         if generation_errors:
             result['generation_errors_details'] = generation_errors
         
-        logging.info(f"Contact leads completed: {result}")
+        logger.info(f"Contact leads completed: {result}")
         return result
         
     except Exception as e:
-        logging.error(f"Error in contact_leads: {str(e)}")
+        logger.error(f"Error in contact_leads: {str(e)}")
         return {
             'success': False,
             'error': str(e),
@@ -268,7 +270,7 @@ def contact_leads(req: https_fn.CallableRequest) -> Dict[str, Any]:
         # Re-raise HttpsError as-is
         raise
     except Exception as e:
-        logging.error(f"Error in contact_leads Firebase Function: {str(e)}")
+        logger.error(f"Error in contact_leads Firebase Function: {str(e)}")
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.INTERNAL,
             message=f"Failed to contact leads: {str(e)}"
@@ -329,7 +331,7 @@ def get_blacklisted_emails(db, project_id: str) -> set:
             global_list = global_blacklist_doc.to_dict().get('list', [])
             blacklisted.update(email.lower() for email in global_list)
     except Exception as e:
-        logging.warning(f"Failed to load global blacklist: {e}")
+        logger.warning(f"Failed to load global blacklist: {e}")
     
     # Project-specific blacklist
     try:
@@ -338,7 +340,7 @@ def get_blacklisted_emails(db, project_id: str) -> set:
             project_list = project_blacklist_doc.to_dict().get('list', [])
             blacklisted.update(email.lower() for email in project_list)
     except Exception as e:
-        logging.warning(f"Failed to load project blacklist: {e}")
+        logger.warning(f"Failed to load project blacklist: {e}")
     
     return blacklisted
 
@@ -403,7 +405,7 @@ def update_lead_after_email(db, lead_id: str, email_type: str, project_id: str):
         lead_ref.update(update_data)
         
     except Exception as e:
-        logging.error(f"Failed to update lead {lead_id}: {e}")
+        logger.error(f"Failed to update lead {lead_id}: {e}")
 
 
 def create_email_record(db, email_data: Dict, project_id: str):
@@ -425,4 +427,4 @@ def create_email_record(db, email_data: Dict, project_id: str):
         db.collection('emails').add(email_record)
         
     except Exception as e:
-        logging.error(f"Failed to create email record: {e}") 
+        logger.error(f"Failed to create email record: {e}") 

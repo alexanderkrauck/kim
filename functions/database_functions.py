@@ -4,7 +4,6 @@ Database Maintenance Firebase Functions
 Provides Firebase Functions for database cleanup and initialization
 """
 
-import logging
 from typing import Dict, Any
 from firebase_functions import https_fn, options
 

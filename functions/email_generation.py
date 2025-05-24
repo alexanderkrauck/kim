@@ -4,7 +4,6 @@ Email Generation Function
 This function handles generating personalized emails using OpenAI and the configuration system.
 """
 
-import logging
 from typing import Dict, List, Optional, Any
 from firebase_functions import https_fn, options
 from firebase_admin import firestore

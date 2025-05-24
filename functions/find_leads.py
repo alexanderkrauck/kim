@@ -5,7 +5,6 @@ This function searches for leads using Apollo.io and optionally triggers enrichm
 Enrichment is now handled by the separate enrich_leads function.
 """
 
-import logging
 import sys
 import time
 from typing import Dict, List, Optional, Any
@@ -94,8 +93,13 @@ def find_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Dict
             'page': 1
         }
         
-        # Add location parameters
-        location_params = location_processor.get_apollo_location_params(effective_config.location)
+        # Process location parameters using project areaDescription and configuration
+        location_params = _process_project_location(
+            project_data, 
+            effective_config.location,
+            location_processor,
+            api_keys
+        )
         apollo_search_params.update(location_params)
         
         # Add job role parameters
@@ -116,6 +120,11 @@ def find_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Dict
         
         # Merge custom search parameters (these can override config)
         apollo_search_params.update(search_params)
+        
+        # Validate that all required parameters have valid (non-empty) values
+        validation_result = _validate_apollo_search_params(apollo_search_params)
+        if not validation_result['valid']:
+            raise ValueError(validation_result['error'])
         
         logger.info(f"Searching Apollo with params: {apollo_search_params}")
         
@@ -300,6 +309,237 @@ def find_leads(req: https_fn.CallableRequest) -> Dict[str, Any]:
         )
 
 
+def _process_project_location(
+    project_data: Dict[str, Any], 
+    location_config: Any,
+    location_processor: Any,
+    api_keys: Dict[str, str]
+) -> Dict[str, Any]:
+    """
+    Process project location using areaDescription and LocationProcessor LLM capabilities
+    
+    Args:
+        project_data: Project data from Firestore
+        location_config: LocationConfig from effective config
+        location_processor: LocationProcessor instance
+        api_keys: Available API keys
+        
+    Returns:
+        Dict with Apollo API location parameters (using clean location strings)
+    """
+    # Get areaDescription from project data
+    area_description = project_data.get('areaDescription', '').strip()
+    
+    if not area_description:
+        logger.warning("Project areaDescription is not set - this is required for proper location targeting")
+        raise ValueError("Project areaDescription must be set for location targeting. Please update the project settings.")
+    
+    logger.info(f"Processing project areaDescription: '{area_description}'")
+    
+    # Check for OpenAI API key - now mandatory for location processing
+    if not api_keys.get('openai'):
+        raise ValueError("OpenAI API key is required for location processing. Please configure the OpenAI API key in your settings.")
+    
+    # Initialize OpenAI client for LLM parsing
+    from openai import OpenAI
+    location_processor.openai_client = OpenAI(api_key=api_keys['openai'])
+    
+    try:
+        # Use LocationProcessor to parse areaDescription with LLM (now returns location strings)
+        clean_locations, parsed_info = location_processor.parse_location_with_llm(area_description)
+        
+        if clean_locations:
+            # Use clean location strings for both person and organization targeting
+            location_params = {
+                'person_locations': clean_locations,
+                'organization_locations': clean_locations
+            }
+            
+            logger.info(f"🎯 LOCATION TARGETING STRATEGY:")
+            logger.info(f"📍 Original input: '{area_description}'")
+            logger.info(f"🔍 Clean locations: {clean_locations}")
+            logger.info(f"📊 Parsing method: {parsed_info.get('method', 'unknown')}")
+            logger.info(f"🎚️ Confidence: {parsed_info.get('confidence', 'unknown')}")
+            
+            if parsed_info.get('ignored_details'):
+                logger.info(f"🚫 Ignored broad areas: {parsed_info['ignored_details']}")
+            
+            # Validate that locations are appropriately narrow
+            narrow_validation = _validate_location_narrowness(clean_locations, area_description)
+            if narrow_validation['warning']:
+                logger.warning(f"⚠️ LOCATION WARNING: {narrow_validation['warning']}")
+            
+            logger.info(f"✅ Location targeting ready: {len(clean_locations)} specific location(s)")
+                
+            return location_params
+                
+        else:
+            raise ValueError(
+                f"Could not extract valid locations from areaDescription: '{area_description}'. "
+                "Please provide a clearer location description (e.g., 'San Francisco Bay Area, California' or 'London, UK')."
+            )
+            
+    except ValueError:
+        # Re-raise ValueError as-is (these are user-facing errors)
+        raise
+    except Exception as e:
+        logger.error(f"Error processing location with LLM: {e}")
+        raise ValueError(
+            f"Failed to process location '{area_description}': {str(e)}. "
+            "Please ensure the OpenAI API key is configured and the location description is clear."
+        )
+
+
+def _validate_location_narrowness(locations: List[str], original_input: str) -> Dict[str, Any]:
+    """
+    Validate that locations are appropriately narrow for effective targeting
+    
+    Args:
+        locations: List of processed location strings
+        original_input: Original area description input
+        
+    Returns:
+        Dict with validation results and warnings
+    """
+    # Broad location indicators (countries, large states, etc.)
+    broad_indicators = [
+        'united states', 'usa', 'america', 'germany', 'austria', 'switzerland', 'france', 'italy',
+        'california', 'texas', 'new york', 'florida', 'illinois', 'pennsylvania',
+        'bavaria', 'baden-württemberg', 'north rhine-westphalia',
+        'europe', 'north america', 'asia'
+    ]
+    
+    warnings = []
+    
+    # Check for overly broad locations
+    for location in locations:
+        location_lower = location.lower().strip()
+        for broad_term in broad_indicators:
+            if location_lower == broad_term:
+                warnings.append(f"'{location}' is too broad - will match entire country/state")
+            elif broad_term in location_lower and len(location_lower) <= len(broad_term) + 10:
+                # Allow things like "Linz, Austria" but flag standalone broad terms
+                if not any(city_indicator in location_lower for city_indicator in [',', 'city', 'district']):
+                    warnings.append(f"'{location}' may be too broad for effective targeting")
+    
+    # Check for mixed specificity levels
+    city_count = 0
+    country_count = 0
+    
+    for location in locations:
+        location_lower = location.lower()
+        # Simple heuristic: if it contains comma, likely city+country; if short and broad, likely country
+        if ',' in location or any(indicator in location_lower for indicator in ['city', 'district', 'borough']):
+            city_count += 1
+        elif any(broad in location_lower for broad in broad_indicators):
+            country_count += 1
+    
+    if city_count > 0 and country_count > 0:
+        warnings.append("Mixed specificity levels detected - broad locations may make specific ones ineffective")
+    
+    # Check for too many variations that might be redundant
+    if len(locations) > 5:
+        warnings.append(f"Many locations ({len(locations)}) specified - consider reducing for more focused targeting")
+    
+    warning_text = "; ".join(warnings) if warnings else None
+    
+    return {
+        'valid': len(warnings) == 0,
+        'warning': warning_text,
+        'city_count': city_count,
+        'broad_count': country_count,
+        'total_locations': len(locations)
+    }
+
+
+def _validate_apollo_search_params(apollo_search_params: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Validate that all Apollo search parameters have valid (non-empty) values
+    
+    Args:
+        apollo_search_params: Dictionary of parameters to be sent to Apollo API
+        
+    Returns:
+        Dict with 'valid' boolean and 'error' message if invalid
+    """
+    required_params = [
+        'person_locations',
+        'organization_locations', 
+        'person_titles'
+    ]
+    
+    # Check for required location parameters
+    person_locations = apollo_search_params.get('person_locations', [])
+    organization_locations = apollo_search_params.get('organization_locations', [])
+    
+    # Location validation - at least one location parameter must be present and non-empty
+    if not person_locations and not organization_locations:
+        return {
+            'valid': False, 
+            'error': 'Location parameters are required but not configured. Please ensure project areaDescription is properly set and contains valid location information.'
+        }
+    
+    # Check if location arrays are empty or contain only empty strings
+    if person_locations and all(not loc or not loc.strip() for loc in person_locations):
+        return {
+            'valid': False,
+            'error': 'Person locations parameter contains only empty values. Please update project areaDescription with valid location information.'
+        }
+    
+    if organization_locations and all(not loc or not loc.strip() for loc in organization_locations):
+        return {
+            'valid': False,
+            'error': 'Organization locations parameter contains only empty values. Please update project areaDescription with valid location information.'
+        }
+    
+    # Check for job titles
+    person_titles = apollo_search_params.get('person_titles', [])
+    if not person_titles or all(not title or not title.strip() for title in person_titles):
+        return {
+            'valid': False,
+            'error': 'Job titles are required but not configured. Please ensure target job roles are set in project settings.'
+        }
+    
+    # Check for contact email status (if present, must not be empty)
+    contact_email_status = apollo_search_params.get('contact_email_status', [])
+    if 'contact_email_status' in apollo_search_params and (
+        not contact_email_status or 
+        all(not status or not status.strip() for status in contact_email_status)
+    ):
+        return {
+            'valid': False,
+            'error': 'Contact email status parameter is present but empty.'
+        }
+    
+    # Check organization size ranges (if present, must not be empty)
+    org_size_ranges = apollo_search_params.get('organization_num_employees_ranges', [])
+    if 'organization_num_employees_ranges' in apollo_search_params and (
+        not org_size_ranges or
+        all(not range_val or not str(range_val).strip() for range_val in org_size_ranges)
+    ):
+        return {
+            'valid': False,
+            'error': 'Organization size ranges parameter is present but empty.'
+        }
+    
+    # Log validated parameters for debugging
+    logger.info(f"✅ APOLLO SEARCH PARAMETERS VALIDATED:")
+    logger.info(f"🎯 Person locations: {person_locations}")
+    logger.info(f"🏢 Organization locations: {organization_locations}")
+    logger.info(f"👔 Person titles: {person_titles}")
+    if contact_email_status:
+        logger.info(f"📧 Contact email status: {contact_email_status}")
+    if org_size_ranges:
+        logger.info(f"👥 Organization size ranges: {org_size_ranges}")
+    
+    # Show location targeting strategy
+    total_locations = len(set(person_locations + organization_locations))
+    logger.info(f"📊 TARGETING SCOPE: {total_locations} unique location(s), {len(person_titles)} job role(s)")
+    logger.info(f"🎚️ Strategy: Narrow location targeting (avoids broad areas for precise results)")
+    
+    return {'valid': True, 'error': None}
+
+
 # Helper functions for lead discovery
 
 def extract_location_from_description(description: str) -> List[str]:
@@ -333,11 +573,10 @@ def determine_target_job_titles(project_details: str) -> List[str]:
     
     Analyzes project details and returns appropriate decision-maker titles.
     """
-    # Basic implementation - default decision-maker titles
+    # Updated default titles to match the new default configuration
     default_titles = [
-        'CEO', 'CTO', 'Founder', 'Co-Founder',
-        'President', 'VP', 'Director',
-        'Head of', 'Manager'
+        'Human Resources', 'Office Manager', 'Secretary',
+        'Assistant', 'Assistant Manager', 'Manager', 'Social Media'
     ]
     
     # Could be enhanced with industry-specific logic based on project details

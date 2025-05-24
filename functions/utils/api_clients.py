@@ -4,9 +4,11 @@ API client utilities for external services
 
 import os
 import requests
-import logging
 from typing import Dict, List, Optional, Any
 from openai import OpenAI
+from utils.logging_config import get_logger
+
+logger = get_logger(__file__)
 
 
 class ApolloClient:
@@ -16,15 +18,18 @@ class ApolloClient:
         self.api_key = api_key
         self.base_url = "https://api.apollo.io/api/v1"
         self.headers = {
-            "Cache-Control": "no-cache",
+            "accept": "application/json",
+            "Cache-Control": "no-cache", 
             "Content-Type": "application/json",
-            "X-Api-Key": api_key
+            "x-api-key": api_key  # Apollo uses lowercase header
         }
     
     def search_people(self, 
-                     company_domains: List[str] = None,
-                     job_titles: List[str] = None,
-                     locations: List[str] = None,
+                     organization_domains: List[str] = None,
+                     person_titles: List[str] = None,
+                     person_locations: List[str] = None,
+                     organization_locations: List[str] = None,
+                     contact_email_status: List[str] = None,
                      page: int = 1,
                      per_page: int = 25,
                      **kwargs) -> Dict[str, Any]:
@@ -32,9 +37,11 @@ class ApolloClient:
         Search for people using Apollo.io API
         
         Args:
-            company_domains: List of company domains to search
-            job_titles: List of job titles to search for
-            locations: List of locations to search in
+            organization_domains: List of company domains to search
+            person_titles: List of job titles to search for
+            person_locations: List of person locations to search in
+            organization_locations: List of organization locations to search in
+            contact_email_status: List of email status filters
             page: Page number for pagination
             per_page: Number of results per page
             **kwargs: Additional search parameters
@@ -42,29 +49,82 @@ class ApolloClient:
         Returns:
             Dict containing search results
         """
-        url = f"{self.base_url}/mixed_people/search"
+        import urllib.parse
         
-        payload = {
-            "page": page,
-            "per_page": per_page
-        }
+        base_url = f"{self.base_url}/mixed_people/search"
         
-        if company_domains:
-            payload["organization_domains"] = company_domains
-        if job_titles:
-            payload["person_titles"] = job_titles
-        if locations:
-            payload["person_locations"] = locations
+        # Build query parameters
+        params = []
         
-        # Add any additional parameters
-        payload.update(kwargs)
+        # Add pagination parameters
+        params.append(f"page={page}")
+        params.append(f"per_page={per_page}")
+        
+        # Add array parameters - Apollo expects array format like: param[]=value1&param[]=value2
+        if organization_domains:
+            for domain in organization_domains:
+                params.append(f"organization_domains[]={urllib.parse.quote(str(domain))}")
+        
+        if person_titles:
+            for title in person_titles:
+                params.append(f"person_titles[]={urllib.parse.quote(str(title))}")
+        
+        if person_locations:
+            for location in person_locations:
+                params.append(f"person_locations[]={urllib.parse.quote(str(location))}")
+                
+        if organization_locations:
+            for location in organization_locations:
+                params.append(f"organization_locations[]={urllib.parse.quote(str(location))}")
+                
+        if contact_email_status:
+            for status in contact_email_status:
+                params.append(f"contact_email_status[]={urllib.parse.quote(str(status))}")
+        
+        # Handle additional parameters from kwargs
+        for key, value in kwargs.items():
+            if isinstance(value, list):
+                # Handle array parameters
+                for item in value:
+                    params.append(f"{key}[]={urllib.parse.quote(str(item))}")
+            else:
+                # Handle single value parameters
+                params.append(f"{key}={urllib.parse.quote(str(value))}")
+        
+        # Build final URL with query parameters
+        if params:
+            url = f"{base_url}?{'&'.join(params)}"
+        else:
+            url = base_url
             
         try:
-            response = requests.post(url, json=payload, headers=self.headers)
+            # Log the complete API call details
+            logger.info("🚀 APOLLO API CALL:")
+            logger.info(f"📋 Method: POST")
+            logger.info(f"🔗 URL: {url}")
+            logger.info(f"📤 Headers: {self.headers}")
+            logger.info(f"📦 Body: None (query parameters only)")
+            
+            # POST request with query parameters, no JSON body
+            response = requests.post(url, headers=self.headers)
+            
+            # Log response details
+            logger.info(f"📥 Response Status: {response.status_code}")
+            logger.info(f"📊 Response Size: {len(response.content)} bytes")
+            
             response.raise_for_status()
-            return response.json()
+            result = response.json()
+            
+            # Log result summary
+            people_count = len(result.get('people', []))
+            total_available = result.get('pagination', {}).get('total_entries', 0)
+            logger.info(f"✅ Apollo Success: {people_count} people returned, {total_available} total available")
+            
+            return result
         except requests.exceptions.RequestException as e:
-            logging.error(f"Apollo API error: {e}")
+            logger.error(f"❌ Apollo API error: {e}")
+            logger.error(f"🔗 Failed URL: {url}")
+            logger.error(f"📤 Headers used: {self.headers}")
             raise
     
     def get_person_details(self, person_id: str) -> Dict[str, Any]:
@@ -76,7 +136,7 @@ class ApolloClient:
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
-            logging.error(f"Apollo API error getting person details: {e}")
+            logger.error(f"Apollo API error getting person details: {e}")
             raise
     
     def test_api_access(self) -> Dict[str, Any]:
@@ -159,7 +219,7 @@ class PerplexityClient:
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
-            logging.error(f"Perplexity API error: {e}")
+            logger.error(f"Perplexity API error: {e}")
             raise
 
 
@@ -204,7 +264,7 @@ class OpenAIClient:
             
             return response.choices[0].message.content
         except Exception as e:
-            logging.error(f"OpenAI API error: {e}")
+            logger.error(f"OpenAI API error: {e}")
             raise
     
     def _get_default_prompt(self, email_type: str) -> str:

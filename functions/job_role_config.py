@@ -3,10 +3,12 @@ Job Role Configuration Functions
 Manages job role settings for projects and global configuration
 """
 
-import logging
 from typing import Dict, List, Any
 from firebase_functions import https_fn, options
 from firebase_admin import firestore
+from utils.logging_config import get_logger
+
+logger = get_logger(__file__)
 
 # Configure European region
 EUROPEAN_REGION = options.SupportedRegion.EUROPE_WEST1
@@ -59,7 +61,7 @@ def get_job_roles_config(req: https_fn.CallableRequest) -> Dict[str, Any]:
             }
             
     except Exception as e:
-        logging.error(f"Error getting job roles config: {e}")
+        logger.error(f"Error getting job roles config: {e}")
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.INTERNAL,
             message=f"Failed to get job roles configuration: {str(e)}"
@@ -94,7 +96,7 @@ def update_job_roles_config(req: https_fn.CallableRequest) -> Dict[str, Any]:
                 role = JobRole(role_str)
                 valid_roles.append(role)
             except ValueError:
-                logging.warning(f"Invalid job role: {role_str}")
+                logger.warning(f"Invalid job role: {role_str}")
         
         # Create job role config
         job_role_config = JobRoleConfig(
@@ -130,7 +132,7 @@ def update_job_roles_config(req: https_fn.CallableRequest) -> Dict[str, Any]:
             raise ValueError("Failed to save configuration to Firebase")
             
     except Exception as e:
-        logging.error(f"Error updating job roles config: {e}")
+        logger.error(f"Error updating job roles config: {e}")
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.INTERNAL,
             message=f"Failed to update job roles configuration: {str(e)}"
@@ -157,7 +159,7 @@ def get_available_job_roles(req: https_fn.CallableRequest) -> Dict[str, Any]:
         }
         
     except Exception as e:
-        logging.error(f"Error getting available job roles: {e}")
+        logger.error(f"Error getting available job roles: {e}")
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.INTERNAL,
             message=f"Failed to get available job roles: {str(e)}"

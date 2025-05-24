@@ -3,10 +3,12 @@ Data processing utilities for lead management
 """
 
 import re
-import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 from config_model import LeadFilterConfig
+from utils.logging_config import get_logger
+
+logger = get_logger(__file__)
 
 
 class DataValidator:
@@ -132,10 +134,10 @@ class LeadProcessor:
                     cleaned_lead = self.validator.clean_lead_data(lead_data)
                     leads.append(cleaned_lead)
                 else:
-                    logging.warning(f"Invalid lead data: {validation['errors']}")
+                    logger.warning(f"Invalid lead data: {validation['errors']}")
             
         except Exception as e:
-            logging.error(f"Error processing Apollo results: {e}")
+            logger.error(f"Error processing Apollo results: {e}")
         
         return leads
     
@@ -164,9 +166,9 @@ class LeadProcessor:
                 
                 # Try to extract structured data from the content
                 enriched_lead['company_insights'] = self._extract_company_insights(content)
-            
+                            
         except Exception as e:
-            logging.error(f"Error enriching lead with Perplexity data: {e}")
+            logger.error(f"Error enriching lead with Perplexity data: {e}")
         
         return enriched_lead
     
@@ -278,7 +280,7 @@ class LeadProcessor:
             if lead.get('email', '').lower() not in existing_emails:
                 unique_leads.append(lead)
             else:
-                logging.info(f"Duplicate lead found: {lead.get('email')}")
+                logger.info(f"Duplicate lead found: {lead.get('email')}")
         
         return unique_leads
     
@@ -312,13 +314,13 @@ class LeadProcessor:
         for lead in leads:
             # Filter by email requirement
             if filter_config.require_email and not lead.get('email'):
-                logging.debug(f"Filtered lead without email: {lead.get('name', 'Unknown')}")
+                logger.debug(f"Filtered lead without email: {lead.get('name', 'Unknown')}")
                 continue
             
             # Filter blacklisted emails
             if filter_config.exclude_blacklisted and lead.get('email'):
                 if lead['email'].lower() in blacklisted_set:
-                    logging.debug(f"Filtered blacklisted email: {lead['email']}")
+                    logger.debug(f"Filtered blacklisted email: {lead['email']}")
                     continue
             
             # Filter one person per company
@@ -327,30 +329,30 @@ class LeadProcessor:
                 
                 # Check if we already have someone from this company
                 if company_name in company_tracker:
-                    logging.debug(f"Filtered duplicate company: {lead['company']}")
+                    logger.debug(f"Filtered duplicate company: {lead['company']}")
                     continue
                 
                 # Check against existing leads
                 if any(self._normalize_company_name(existing_lead.get('company', '')) == company_name 
                        for existing_lead in existing_leads):
-                    logging.debug(f"Filtered company already in existing leads: {lead['company']}")
+                    logger.debug(f"Filtered company already in existing leads: {lead['company']}")
                     continue
                 
                 company_tracker[company_name] = True
             
             # Filter by company size (if data is available)
             if self._should_filter_by_company_size(lead, filter_config):
-                logging.debug(f"Filtered by company size: {lead.get('company', 'Unknown')}")
+                logger.debug(f"Filtered by company size: {lead.get('company', 'Unknown')}")
                 continue
             
             # Add additional quality filters
             if not self._passes_quality_filters(lead):
-                logging.debug(f"Filtered by quality checks: {lead.get('email', 'Unknown')}")
+                logger.debug(f"Filtered by quality checks: {lead.get('email', 'Unknown')}")
                 continue
             
             filtered_leads.append(lead)
         
-        logging.info(f"Lead filtering results: {len(leads)} -> {len(filtered_leads)} after applying filters")
+        logger.info(f"Lead filtering results: {len(leads)} -> {len(filtered_leads)} after applying filters")
         return filtered_leads
     
     def _normalize_company_name(self, company_name: str) -> str:

@@ -128,7 +128,7 @@ When running initialization, the system creates:
 4. **Job Roles** (`settings/jobRoles`)
    ```json
    {
-     "targetRoles": ["CEO", "CTO", "Founder", "Co-Founder"],
+     "targetRoles": ["Human Resources", "Office Manager", "Secretary", "Assistant", "Assistant Manager", "Manager", "Social Media"],
      "customRoles": []
    }
    ```

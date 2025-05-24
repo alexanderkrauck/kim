@@ -3,7 +3,6 @@ Configuration Sync Utilities
 Syncs Python configuration schema to Firebase and vice versa
 """
 
-import logging
 from typing import Dict, Any, Optional
 from firebase_admin import firestore
 from dataclasses import asdict

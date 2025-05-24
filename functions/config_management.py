@@ -4,10 +4,12 @@ Configuration Management Functions
 This module provides Firebase Functions for managing global and project-specific configurations.
 """
 
-import logging
 from typing import Dict, List, Optional, Any
 from firebase_functions import https_fn, options
 from firebase_admin import firestore
+from utils.logging_config import get_logger
+
+logger = get_logger(__file__)
 
 # Configure European region
 EUROPEAN_REGION = options.SupportedRegion.EUROPE_WEST1
@@ -91,7 +93,7 @@ def get_global_config_logic(request_data: Dict[str, Any], auth_uid: str = None) 
         }
         
     except Exception as e:
-        logging.error(f"Error getting global config: {str(e)}")
+        logger.error(f"Error getting global config: {str(e)}")
         return {
             'success': False,
             'error': str(e),
@@ -119,7 +121,7 @@ def get_global_config(req: https_fn.CallableRequest) -> Dict[str, Any]:
     except https_fn.HttpsError:
         raise
     except Exception as e:
-        logging.error(f"Error in get_global_config Firebase Function: {str(e)}")
+        logger.error(f"Error in get_global_config Firebase Function: {str(e)}")
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.INTERNAL,
             message=f"Failed to get global config: {str(e)}"
@@ -203,7 +205,7 @@ def update_global_config_logic(request_data: Dict[str, Any], auth_uid: str = Non
         }
         
     except Exception as e:
-        logging.error(f"Error updating global config: {str(e)}")
+        logger.error(f"Error updating global config: {str(e)}")
         return {
             'success': False,
             'error': str(e),
@@ -231,7 +233,7 @@ def update_global_config(req: https_fn.CallableRequest) -> Dict[str, Any]:
     except https_fn.HttpsError:
         raise
     except Exception as e:
-        logging.error(f"Error in update_global_config Firebase Function: {str(e)}")
+        logger.error(f"Error in update_global_config Firebase Function: {str(e)}")
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.INTERNAL,
             message=f"Failed to update global config: {str(e)}"
@@ -317,7 +319,7 @@ def get_project_config_logic(request_data: Dict[str, Any], auth_uid: str = None)
         }
         
     except Exception as e:
-        logging.error(f"Error getting project config: {str(e)}")
+        logger.error(f"Error getting project config: {str(e)}")
         return {
             'success': False,
             'error': str(e),
@@ -345,7 +347,7 @@ def get_project_config(req: https_fn.CallableRequest) -> Dict[str, Any]:
     except https_fn.HttpsError:
         raise
     except Exception as e:
-        logging.error(f"Error in get_project_config Firebase Function: {str(e)}")
+        logger.error(f"Error in get_project_config Firebase Function: {str(e)}")
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.INTERNAL,
             message=f"Failed to get project config: {str(e)}"
@@ -404,7 +406,7 @@ def update_project_config_logic(request_data: Dict[str, Any], auth_uid: str = No
         }
         
     except Exception as e:
-        logging.error(f"Error updating project config: {str(e)}")
+        logger.error(f"Error updating project config: {str(e)}")
         return {
             'success': False,
             'error': str(e),
@@ -432,7 +434,7 @@ def update_project_config(req: https_fn.CallableRequest) -> Dict[str, Any]:
     except https_fn.HttpsError:
         raise
     except Exception as e:
-        logging.error(f"Error in update_project_config Firebase Function: {str(e)}")
+        logger.error(f"Error in update_project_config Firebase Function: {str(e)}")
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.INTERNAL,
             message=f"Failed to update project config: {str(e)}"

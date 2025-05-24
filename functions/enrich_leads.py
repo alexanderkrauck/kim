@@ -5,7 +5,6 @@ This function enriches existing leads with Perplexity research and additional da
 Can be used to re-enrich leads or enrich leads that were added without enrichment.
 """
 
-import logging
 from typing import Dict, List, Optional, Any
 from firebase_functions import https_fn, options
 

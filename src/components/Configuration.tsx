@@ -16,9 +16,8 @@ import {
   MagnifyingGlassIcon,
   DocumentTextIcon
 } from '@heroicons/react/24/outline';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
-import { db, functions } from '../firebase/config';
-import { httpsCallable } from 'firebase/functions';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '../firebase/config';
 
 interface ConfigSection {
   id: string;
@@ -28,16 +27,7 @@ interface ConfigSection {
   isExpanded?: boolean;
 }
 
-interface InitializationResponse {
-  success: boolean;
-  initialization_results: {
-    initialized: string[];
-    skipped: string[];
-    errors: string[];
-    force: boolean;
-  };
-  error?: string;
-}
+
 
 interface GlobalConfig {
   // API Keys
@@ -153,10 +143,6 @@ const Configuration: React.FC = () => {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['apiKeys']));
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [rawConfigMode, setRawConfigMode] = useState(false);
-  const [rawConfigText, setRawConfigText] = useState('');
-  const [isInitializing, setIsInitializing] = useState(false);
   const [configExists, setConfigExists] = useState(false);
 
   const configSections: ConfigSection[] = [
@@ -214,29 +200,7 @@ const Configuration: React.FC = () => {
     loadConfiguration();
   }, []);
 
-  const initializeConfiguration = async () => {
-    try {
-      setIsInitializing(true);
-      toast.loading('Initializing configuration...', { id: 'config-init' });
 
-      const initializeDb = httpsCallable(functions, 'database_initialize');
-      const result = await initializeDb();
-      const data = result.data as InitializationResponse;
-
-      if (data?.success) {
-        toast.success('Configuration initialized successfully', { id: 'config-init' });
-        // Reload configuration after initialization
-        await loadConfiguration();
-      } else {
-        throw new Error(data?.error || 'Failed to initialize configuration');
-      }
-    } catch (error) {
-      console.error('Error initializing configuration:', error);
-      toast.error('Failed to initialize configuration', { id: 'config-init' });
-    } finally {
-      setIsInitializing(false);
-    }
-  };
 
   const checkConfigurationExists = (docs: any[]) => {
     // Check if at least the core configuration documents exist and have data
@@ -268,7 +232,6 @@ const Configuration: React.FC = () => {
       if (!configExistsCheck) {
         console.log('Configuration not found, will need initialization');
         setConfig(EMPTY_CONFIG);
-        setRawConfigText(JSON.stringify(EMPTY_CONFIG, null, 2));
         return;
       }
 
@@ -339,7 +302,6 @@ const Configuration: React.FC = () => {
       }
 
       setConfig(newConfig);
-      setRawConfigText(JSON.stringify(newConfig, null, 2));
     } catch (error) {
       console.error('Error loading configuration:', error);
       toast.error('Failed to load configuration');
@@ -422,22 +384,7 @@ const Configuration: React.FC = () => {
     }
   };
 
-  const saveRawConfiguration = async () => {
-    try {
-      setIsSaving(true);
-      const parsedConfig = JSON.parse(rawConfigText);
-      setConfig(parsedConfig);
-      
-      // Save the parsed config
-      await saveConfiguration();
-      setRawConfigMode(false);
-    } catch (error) {
-      console.error('Error parsing raw configuration:', error);
-      toast.error('Invalid JSON configuration');
-    } finally {
-      setIsSaving(false);
-    }
-  };
+
 
   const toggleSection = (sectionId: string) => {
     const newExpanded = new Set(expandedSections);
@@ -495,23 +442,9 @@ const Configuration: React.FC = () => {
                 Your system configuration hasn't been initialized yet. This is required before you can use the lead generation features.
               </p>
               <div className="mt-6">
-                <button
-                  onClick={initializeConfiguration}
-                  disabled={isInitializing}
-                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-                >
-                  {isInitializing ? (
-                    <>
-                      <div className="animate-spin -ml-1 mr-3 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-                      Initializing...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircleIcon className="-ml-1 mr-2 h-4 w-4" />
-                      Initialize Configuration
-                    </>
-                  )}
-                </button>
+                <p className="text-sm text-gray-600">
+                  Please contact your system administrator to initialize the configuration.
+                </p>
               </div>
             </div>
           </div>
@@ -535,26 +468,7 @@ const Configuration: React.FC = () => {
             </div>
             <div className="flex items-center space-x-3">
               <button
-                onClick={() => setShowAdvanced(!showAdvanced)}
-                className="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                {showAdvanced ? 'Hide Advanced' : 'Show Advanced'}
-              </button>
-              <button
-                onClick={() => setRawConfigMode(!rawConfigMode)}
-                className="px-3 py-2 text-sm font-medium text-indigo-700 bg-indigo-100 border border-indigo-300 rounded-md hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                {rawConfigMode ? 'Visual Mode' : 'Raw JSON Mode'}
-              </button>
-              <button
-                onClick={initializeConfiguration}
-                disabled={isInitializing}
-                className="px-3 py-2 text-sm font-medium text-amber-700 bg-amber-100 border border-amber-300 rounded-md hover:bg-amber-200 focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
-              >
-                {isInitializing ? 'Initializing...' : 'Reinitialize'}
-              </button>
-              <button
-                onClick={rawConfigMode ? saveRawConfiguration : saveConfiguration}
+                onClick={saveConfiguration}
                 disabled={isSaving || !configExists}
                 className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
               >
@@ -592,24 +506,7 @@ const Configuration: React.FC = () => {
         )}
       </div>
 
-      {rawConfigMode ? (
-        /* Raw JSON Editor */
-        <div className="bg-white shadow rounded-lg">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Raw Configuration (JSON)</h2>
-            <p className="text-sm text-gray-600">Edit the complete configuration as JSON</p>
-          </div>
-          <div className="p-6">
-            <textarea
-              value={rawConfigText}
-              onChange={(e) => setRawConfigText(e.target.value)}
-              className="w-full h-96 font-mono text-sm border border-gray-300 rounded-md p-3 focus:ring-indigo-500 focus:border-indigo-500"
-              placeholder="Enter configuration JSON..."
-            />
-          </div>
-        </div>
-      ) : (
-        /* Visual Configuration Sections */
+      {/* Visual Configuration Sections */}
         <div className="space-y-4">
           {configSections.map((section) => {
             const isExpanded = expandedSections.has(section.id);
@@ -942,7 +839,7 @@ const Configuration: React.FC = () => {
                             Target Job Roles
                           </label>
                           <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-4">
-                            {['CEO', 'CTO', 'Founder', 'Co-Founder', 'President', 'VP Engineering', 'VP Technology', 'Head of Engineering', 'Engineering Manager', 'Technical Director'].map((role) => (
+                            {['Human Resources', 'Office Manager', 'Secretary', 'Assistant', 'Assistant Manager', 'Manager', 'Social Media', 'CEO', 'CTO', 'Founder', 'Co-Founder', 'President', 'VP Engineering', 'VP Technology', 'Head of Engineering', 'Engineering Manager', 'Technical Director'].map((role) => (
                               <label key={role} className="flex items-center">
                                 <input
                                   type="checkbox"
@@ -1132,7 +1029,6 @@ const Configuration: React.FC = () => {
             );
           })}
         </div>
-      )}
     </div>
   );
 };

@@ -3,10 +3,12 @@ Database Maintenance Utilities
 Handles cleanup of old database patterns and initialization of proper configuration structure
 """
 
-import logging
 from typing import Dict, List, Any, Optional
 from firebase_admin import firestore
 from datetime import datetime, timedelta
+from utils.logging_config import get_logger
+
+logger = get_logger(__file__)
 
 from config_model import GlobalConfig, DEFAULT_GLOBAL_CONFIG
 from config_sync import get_config_sync
@@ -38,7 +40,7 @@ class DatabaseMaintenanceManager:
         }
         
         try:
-            logging.info(f"Starting database cleanup (dry_run={dry_run})")
+            logger.info(f"Starting database cleanup (dry_run={dry_run})")
             
             # 1. Clean up old API key documents (if they exist separately)
             old_api_patterns = [
@@ -55,7 +57,7 @@ class DatabaseMaintenanceManager:
                             doc_ref.delete()
                             cleanup_results['actions_taken'].append(f'Deleted config/{pattern}')
                 except Exception as e:
-                    logging.warning(f"Could not process {pattern}: {e}")
+                    logger.warning(f"Could not process {pattern}: {e}")
             
             # 2. Clean up old settings structure
             old_settings_patterns = [
@@ -78,7 +80,7 @@ class DatabaseMaintenanceManager:
                                 doc_ref.delete()
                                 cleanup_results['actions_taken'].append(f'Deleted {collection_name}/{pattern}')
                 except Exception as e:
-                    logging.warning(f"Could not process {pattern}: {e}")
+                    logger.warning(f"Could not process {pattern}: {e}")
             
             # 3. Clean up old prompt structures
             old_prompt_patterns = [
@@ -97,7 +99,7 @@ class DatabaseMaintenanceManager:
                             doc_ref.delete()
                             cleanup_results['actions_taken'].append(f'Deleted prompts/{pattern}')
                 except Exception as e:
-                    logging.warning(f"Could not process {pattern}: {e}")
+                    logger.warning(f"Could not process {pattern}: {e}")
             
             # 4. Clean up orphaned project documents
             self._cleanup_orphaned_project_configs(cleanup_results, dry_run)
@@ -108,11 +110,11 @@ class DatabaseMaintenanceManager:
             # 6. Validate and fix leads with missing fields
             self._validate_lead_structure(cleanup_results, dry_run)
             
-            logging.info(f"Database cleanup completed. Results: {cleanup_results}")
+            logger.info(f"Database cleanup completed. Results: {cleanup_results}")
             return cleanup_results
             
         except Exception as e:
-            logging.error(f"Error during database cleanup: {e}")
+            logger.error(f"Error during database cleanup: {e}")
             cleanup_results['error'] = str(e)
             return cleanup_results
     
@@ -160,7 +162,7 @@ class DatabaseMaintenanceManager:
                             results['actions_taken'].append(f'Deleted orphaned prompts/{doc_id}')
                             
         except Exception as e:
-            logging.warning(f"Error cleaning up orphaned project configs: {e}")
+            logger.warning(f"Error cleaning up orphaned project configs: {e}")
     
     def _cleanup_old_email_records(self, results: Dict, dry_run: bool):
         """Clean up old email records with deprecated structure"""
@@ -184,10 +186,10 @@ class DatabaseMaintenanceManager:
                     old_emails_count += 1
             
             if old_emails_count > 0:
-                logging.info(f"Found {old_emails_count} old email records to clean up")
+                logger.info(f"Found {old_emails_count} old email records to clean up")
                 
         except Exception as e:
-            logging.warning(f"Error cleaning up old email records: {e}")
+            logger.warning(f"Error cleaning up old email records: {e}")
     
     def _validate_lead_structure(self, results: Dict, dry_run: bool):
         """Validate and fix lead documents with missing required fields"""
@@ -224,7 +226,7 @@ class DatabaseMaintenanceManager:
                         results['actions_taken'].append(f'Updated lead structure for {doc.id}')
                         
         except Exception as e:
-            logging.warning(f"Error validating lead structure: {e}")
+            logger.warning(f"Error validating lead structure: {e}")
     
     def initialize_default_configuration(self, force: bool = False) -> Dict[str, Any]:
         """
@@ -244,14 +246,14 @@ class DatabaseMaintenanceManager:
         }
         
         try:
-            logging.info(f"Initializing default configuration (force={force})")
+            logger.info(f"Initializing default configuration (force={force})")
             
             # Check if global configuration already exists
             config_exists = self._check_configuration_exists()
             
             if config_exists and not force:
                 init_results['skipped'].append('Global configuration already exists')
-                logging.info("Global configuration already exists, skipping initialization")
+                logger.info("Global configuration already exists, skipping initialization")
                 return init_results
             
             # Initialize with default global configuration
@@ -268,12 +270,12 @@ class DatabaseMaintenanceManager:
                 # Initialize system metadata
                 self._initialize_system_metadata(init_results, force)
                 
-                logging.info("Default configuration initialized successfully")
+                logger.info("Default configuration initialized successfully")
             else:
                 init_results['errors'].append('Failed to sync global configuration')
                 
         except Exception as e:
-            logging.error(f"Error initializing default configuration: {e}")
+            logger.error(f"Error initializing default configuration: {e}")
             init_results['errors'].append(str(e))
         
         return init_results
@@ -296,7 +298,7 @@ class DatabaseMaintenanceManager:
             return True
             
         except Exception as e:
-            logging.warning(f"Error checking configuration existence: {e}")
+            logger.warning(f"Error checking configuration existence: {e}")
             return False
     
     def _initialize_blacklist(self, results: Dict, force: bool):
@@ -316,7 +318,7 @@ class DatabaseMaintenanceManager:
                 results['skipped'].append('Global blacklist already exists')
                 
         except Exception as e:
-            logging.warning(f"Error initializing blacklist: {e}")
+            logger.warning(f"Error initializing blacklist: {e}")
             results['errors'].append(f'Blacklist initialization failed: {e}')
     
     def _initialize_system_metadata(self, results: Dict, force: bool):
@@ -338,7 +340,7 @@ class DatabaseMaintenanceManager:
                 results['skipped'].append('System metadata already exists')
                 
         except Exception as e:
-            logging.warning(f"Error initializing system metadata: {e}")
+            logger.warning(f"Error initializing system metadata: {e}")
             results['errors'].append(f'System metadata initialization failed: {e}')
     
     def get_database_health_report(self) -> Dict[str, Any]:
@@ -370,7 +372,7 @@ class DatabaseMaintenanceManager:
             health_report['recommendations'] = self._generate_recommendations(health_report)
             
         except Exception as e:
-            logging.error(f"Error generating health report: {e}")
+            logger.error(f"Error generating health report: {e}")
             health_report['error'] = str(e)
         
         return health_report
@@ -405,7 +407,7 @@ class DatabaseMaintenanceManager:
             config_health['global_config_complete'] = missing_count == 0
             
         except Exception as e:
-            logging.warning(f"Error checking configuration health: {e}")
+            logger.warning(f"Error checking configuration health: {e}")
             config_health['error'] = str(e)
         
         return config_health
@@ -439,7 +441,7 @@ class DatabaseMaintenanceManager:
                     integrity_report['invalid_leads'] += 1
             
         except Exception as e:
-            logging.warning(f"Error checking data integrity: {e}")
+            logger.warning(f"Error checking data integrity: {e}")
             integrity_report['error'] = str(e)
         
         return integrity_report
@@ -458,11 +460,11 @@ class DatabaseMaintenanceManager:
                     count = len(list(collection_ref.stream()))
                     stats[f'{collection_name}_count'] = count
                 except Exception as e:
-                    logging.warning(f"Error counting {collection_name}: {e}")
+                    logger.warning(f"Error counting {collection_name}: {e}")
                     stats[f'{collection_name}_count'] = -1
             
         except Exception as e:
-            logging.warning(f"Error generating statistics: {e}")
+            logger.warning(f"Error generating statistics: {e}")
             stats['error'] = str(e)
         
         return stats
@@ -493,7 +495,7 @@ class DatabaseMaintenanceManager:
                 recommendations.append("Consider archiving old email records for better performance")
             
         except Exception as e:
-            logging.warning(f"Error generating recommendations: {e}")
+            logger.warning(f"Error generating recommendations: {e}")
         
         return recommendations
 

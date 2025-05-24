@@ -3,11 +3,13 @@ Email utility functions for sending outreach emails
 """
 
 import smtplib
-import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Dict, List, Optional
 from .firebase_utils import get_smtp_settings
+from utils.logging_config import get_logger
+
+logger = get_logger(__file__)
 
 
 class EmailService:
@@ -43,11 +45,11 @@ class EmailService:
                 self.smtp_settings['password']
             )
             
-            logging.info("SMTP connection established")
+            logger.info("SMTP connection established")
             return True
             
         except Exception as e:
-            logging.error(f"Failed to connect to SMTP server: {e}")
+            logger.error(f"Failed to connect to SMTP server: {e}")
             return False
     
     def disconnect(self):
@@ -55,9 +57,9 @@ class EmailService:
         if self.smtp_server:
             try:
                 self.smtp_server.quit()
-                logging.info("SMTP connection closed")
+                logger.info("SMTP connection closed")
             except Exception as e:
-                logging.error(f"Error closing SMTP connection: {e}")
+                logger.error(f"Error closing SMTP connection: {e}")
     
     def send_email(self,
                    to_email: str,
@@ -110,11 +112,11 @@ class EmailService:
                     return False
             
             self.smtp_server.send_message(msg)
-            logging.info(f"Email sent successfully to {to_email}")
+            logger.info(f"Email sent successfully to {to_email}")
             return True
             
         except Exception as e:
-            logging.error(f"Failed to send email to {to_email}: {e}")
+            logger.error(f"Failed to send email to {to_email}: {e}")
             return False
     
     def send_bulk_emails(self, email_list: List[Dict]) -> Dict[str, int]:
@@ -131,7 +133,7 @@ class EmailService:
         results = {'sent': 0, 'failed': 0}
         
         if not self.connect():
-            logging.error("Failed to establish SMTP connection for bulk emails")
+            logger.error("Failed to establish SMTP connection for bulk emails")
             return results
         
         try:
@@ -152,7 +154,7 @@ class EmailService:
         finally:
             self.disconnect()
         
-        logging.info(f"Bulk email results: {results['sent']} sent, {results['failed']} failed")
+        logger.info(f"Bulk email results: {results['sent']} sent, {results['failed']} failed")
         return results
     
     def test_connection(self) -> bool:

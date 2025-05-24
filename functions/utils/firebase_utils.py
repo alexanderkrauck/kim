@@ -3,10 +3,12 @@ Firebase utility functions
 """
 
 import os
-import logging
 from typing import Dict, Optional
 from firebase_admin import firestore
 from dotenv import load_dotenv
+from utils.logging_config import get_logger
+
+logger = get_logger(__file__)
 
 # Load environment variables for local development
 load_dotenv()
@@ -50,10 +52,10 @@ def get_api_keys(use_env: bool = False) -> Dict[str, str]:
                     'perplexity': data.get('perplexityApiKey')
                 }
             else:
-                logging.warning("API keys document not found in Firebase")
+                logger.warning("API keys document not found in Firebase")
                 return {}
         except Exception as e:
-            logging.error(f"Error getting API keys from Firebase: {e}")
+            logger.error(f"Error getting API keys from Firebase: {e}")
             return {}
 
 
@@ -88,10 +90,10 @@ def get_smtp_settings(use_env: bool = False) -> Dict[str, any]:
             if smtp_doc.exists:
                 return smtp_doc.to_dict()
             else:
-                logging.warning("SMTP settings document not found in Firebase")
+                logger.warning("SMTP settings document not found in Firebase")
                 return {}
         except Exception as e:
-            logging.error(f"Error getting SMTP settings from Firebase: {e}")
+            logger.error(f"Error getting SMTP settings from Firebase: {e}")
             return {}
 
 
@@ -131,11 +133,11 @@ def get_project_settings(project_id: str) -> Dict[str, any]:
                 return global_settings_doc.to_dict()
             else:
                 # No default settings - configuration must be initialized
-                logging.warning("Global settings document not found - configuration needs initialization")
+                logger.warning("Global settings document not found - configuration needs initialization")
                 return {}
                 
     except Exception as e:
-        logging.error(f"Error getting project settings: {e}")
+        logger.error(f"Error getting project settings: {e}")
         return {}
 
 
@@ -174,9 +176,9 @@ def get_project_prompts(project_id: str) -> Dict[str, str]:
         if global_prompts_doc.exists:
             return global_prompts_doc.to_dict()
         else:
-            logging.warning("Global prompts document not found - configuration needs initialization")
+            logger.warning("Global prompts document not found - configuration needs initialization")
             return {}
             
     except Exception as e:
-        logging.error(f"Error getting project prompts: {e}")
+        logger.error(f"Error getting project prompts: {e}")
         return {} 
