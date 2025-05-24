@@ -70,14 +70,14 @@ def get_smtp_settings(use_env: bool = False) -> Dict[str, any]:
     if use_env or os.getenv('DEBUG') == 'true':
         # Use environment variables for local development
         return {
-            'host': os.getenv('SMTP_HOST', 'smtp.gmail.com'),
+            'host': os.getenv('SMTP_HOST', ''),
             'port': int(os.getenv('SMTP_PORT', '587')),
             'secure': os.getenv('SMTP_SECURE', 'false').lower() == 'true',
-            'username': os.getenv('SMTP_USERNAME'),
-            'password': os.getenv('SMTP_PASSWORD'),
-            'fromEmail': os.getenv('SMTP_FROM_EMAIL'),
-            'fromName': os.getenv('SMTP_FROM_NAME'),
-            'replyToEmail': os.getenv('SMTP_REPLY_TO_EMAIL')
+            'username': os.getenv('SMTP_USERNAME', ''),
+            'password': os.getenv('SMTP_PASSWORD', ''),
+            'fromEmail': os.getenv('SMTP_FROM_EMAIL', ''),
+            'fromName': os.getenv('SMTP_FROM_NAME', ''),
+            'replyToEmail': os.getenv('SMTP_REPLY_TO_EMAIL', '')
         }
     else:
         # Use Firebase for production
@@ -130,18 +130,13 @@ def get_project_settings(project_id: str) -> Dict[str, any]:
             if global_settings_doc.exists:
                 return global_settings_doc.to_dict()
             else:
-                # Return default settings
-                return {
-                    'followupDelayDays': 7,
-                    'maxFollowups': 3
-                }
+                # No default settings - configuration must be initialized
+                logging.warning("Global settings document not found - configuration needs initialization")
+                return {}
                 
     except Exception as e:
         logging.error(f"Error getting project settings: {e}")
-        return {
-            'followupDelayDays': 7,
-            'maxFollowups': 3
-        }
+        return {}
 
 
 def get_project_prompts(project_id: str) -> Dict[str, str]:
@@ -179,14 +174,9 @@ def get_project_prompts(project_id: str) -> Dict[str, str]:
         if global_prompts_doc.exists:
             return global_prompts_doc.to_dict()
         else:
-            return {
-                'outreachPrompt': '',
-                'followupPrompt': ''
-            }
+            logging.warning("Global prompts document not found - configuration needs initialization")
+            return {}
             
     except Exception as e:
         logging.error(f"Error getting project prompts: {e}")
-        return {
-            'outreachPrompt': '',
-            'followupPrompt': ''
-        } 
+        return {} 

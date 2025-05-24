@@ -17,7 +17,8 @@ import {
   DocumentTextIcon
 } from '@heroicons/react/24/outline';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { db, functions } from '../firebase/config';
+import { httpsCallable } from 'firebase/functions';
 
 interface ConfigSection {
   id: string;
@@ -25,6 +26,17 @@ interface ConfigSection {
   description: string;
   icon: React.ComponentType<any>;
   isExpanded?: boolean;
+}
+
+interface InitializationResponse {
+  success: boolean;
+  initialization_results: {
+    initialized: string[];
+    skipped: string[];
+    errors: string[];
+    force: boolean;
+  };
+  error?: string;
 }
 
 interface GlobalConfig {
@@ -81,7 +93,8 @@ interface GlobalConfig {
   followupPrompt: string;
 }
 
-const DEFAULT_CONFIG: GlobalConfig = {
+// Empty config interface for initialization
+const EMPTY_CONFIG: GlobalConfig = {
   // API Keys
   openaiApiKey: '',
   apolloApiKey: '',
@@ -89,7 +102,7 @@ const DEFAULT_CONFIG: GlobalConfig = {
   perplexityApiKey: '',
   
   // SMTP Settings
-  smtpHost: 'smtp.gmail.com',
+  smtpHost: '',
   smtpPort: 587,
   smtpSecure: false,
   smtpUsername: '',
@@ -99,94 +112,52 @@ const DEFAULT_CONFIG: GlobalConfig = {
   smtpReplyToEmail: '',
   
   // Global Settings
-  followupDelayDays: 7,
-  maxFollowups: 3,
-  dailyEmailLimit: 50,
-  rateLimitDelaySeconds: 60,
-  workingHoursStart: 9,
-  workingHoursEnd: 17,
-  workingDays: [0, 1, 2, 3, 4], // Mon-Fri
-  timezone: 'UTC',
+  followupDelayDays: 0,
+  maxFollowups: 0,
+  dailyEmailLimit: 0,
+  rateLimitDelaySeconds: 0,
+  workingHoursStart: 0,
+  workingHoursEnd: 0,
+  workingDays: [],
+  timezone: '',
   
   // Lead Filter Settings
-  onePersonPerCompany: true,
-  requireEmail: true,
-  excludeBlacklisted: true,
+  onePersonPerCompany: false,
+  requireEmail: false,
+  excludeBlacklisted: false,
   minCompanySize: null,
   maxCompanySize: null,
   
   // Job Roles
-  targetRoles: ['CEO', 'CTO', 'Founder', 'Co-Founder'],
+  targetRoles: [],
   customRoles: [],
   
   // Enrichment Settings
-  enrichmentEnabled: true,
-  enrichmentMaxRetries: 3,
-  enrichmentTimeoutSeconds: 30,
-  enrichmentPromptTemplate: `Research the following company and person for a business outreach email:
-
-Company: {company}
-Person: {name} ({title})
-
-Please provide:
-1. Brief company overview and recent news
-2. Person's background and role  
-3. Any recent achievements or initiatives
-4. Relevant industry trends affecting them
-
-Keep the response concise and professional.`,
+  enrichmentEnabled: false,
+  enrichmentMaxRetries: 0,
+  enrichmentTimeoutSeconds: 0,
+  enrichmentPromptTemplate: '',
   
   // Email Generation Settings
-  emailModel: 'gpt-4',
-  emailMaxTokens: 500,
-  emailTemperature: 0.7,
+  emailModel: '',
+  emailMaxTokens: 0,
+  emailTemperature: 0,
   
   // Global Prompts
-  outreachPrompt: `You are writing a professional outreach email for a business proposal.
-
-Context:
-- Project: {project_name}
-- Project Description: {project_description}
-- Target: {name} at {company}
-- Enrichment Data: {enrichment_data}
-- Email Considerations: {email_considerations}
-
-Write a personalized, professional email that:
-1. Is concise (under 150 words)
-2. Clearly states the value proposition
-3. Includes a specific call to action
-4. Uses the enrichment data naturally
-5. Feels personal, not template-like
-
-Subject line and email body:`,
-  
-  followupPrompt: `You are writing a follow-up email for a business proposal.
-
-Context:
-- Previous email sent {days_ago} days ago
-- Project: {project_name}
-- Target: {name} at {company}
-- Original email: {original_email}
-- Followup Considerations: {followup_considerations}
-
-Write a brief, professional follow-up that:
-1. Acknowledges the previous email
-2. Adds new value or perspective
-3. Is even more concise (under 100 words)
-4. Maintains professionalism
-5. Includes a clear call to action
-
-Subject line and email body:`
+  outreachPrompt: '',
+  followupPrompt: ''
 };
 
 const Configuration: React.FC = () => {
-  const [config, setConfig] = useState<GlobalConfig>(DEFAULT_CONFIG);
+  const [config, setConfig] = useState<GlobalConfig>(EMPTY_CONFIG);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['apiKeys']));
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [rawConfigMode, setRawConfigMode] = useState(false);
   const [rawConfigText, setRawConfigText] = useState('');
+  const [isInitializing, setIsInitializing] = useState(false);
+  const [configExists, setConfigExists] = useState(false);
 
   const configSections: ConfigSection[] = [
     {
@@ -243,6 +214,38 @@ const Configuration: React.FC = () => {
     loadConfiguration();
   }, []);
 
+  const initializeConfiguration = async () => {
+    try {
+      setIsInitializing(true);
+      toast.loading('Initializing configuration...', { id: 'config-init' });
+
+      const initializeDb = httpsCallable(functions, 'database_initialize');
+      const result = await initializeDb();
+      const data = result.data as InitializationResponse;
+
+      if (data?.success) {
+        toast.success('Configuration initialized successfully', { id: 'config-init' });
+        // Reload configuration after initialization
+        await loadConfiguration();
+      } else {
+        throw new Error(data?.error || 'Failed to initialize configuration');
+      }
+    } catch (error) {
+      console.error('Error initializing configuration:', error);
+      toast.error('Failed to initialize configuration', { id: 'config-init' });
+    } finally {
+      setIsInitializing(false);
+    }
+  };
+
+  const checkConfigurationExists = (docs: any[]) => {
+    // Check if at least the core configuration documents exist and have data
+    const [apiKeysDoc, smtpDoc, globalDoc, jobRolesDoc, enrichmentDoc, emailGenDoc, promptsDoc] = docs;
+    
+    return apiKeysDoc.exists() && smtpDoc.exists() && globalDoc.exists() && 
+           jobRolesDoc.exists() && enrichmentDoc.exists() && emailGenDoc.exists() && promptsDoc.exists();
+  };
+
   const loadConfiguration = async () => {
     try {
       setIsLoading(true);
@@ -258,7 +261,18 @@ const Configuration: React.FC = () => {
         getDoc(doc(db, 'prompts', 'global'))
       ]);
 
-      const newConfig = { ...DEFAULT_CONFIG };
+      // Check if configuration exists
+      const configExistsCheck = checkConfigurationExists([apiKeysDoc, smtpDoc, globalDoc, jobRolesDoc, enrichmentDoc, emailGenDoc, promptsDoc]);
+      setConfigExists(configExistsCheck);
+
+      if (!configExistsCheck) {
+        console.log('Configuration not found, will need initialization');
+        setConfig(EMPTY_CONFIG);
+        setRawConfigText(JSON.stringify(EMPTY_CONFIG, null, 2));
+        return;
+      }
+
+      const newConfig = { ...EMPTY_CONFIG };
 
       if (apiKeysDoc.exists()) {
         const data = apiKeysDoc.data();
@@ -270,7 +284,7 @@ const Configuration: React.FC = () => {
 
       if (smtpDoc.exists()) {
         const data = smtpDoc.data();
-        newConfig.smtpHost = data.host || 'smtp.gmail.com';
+        newConfig.smtpHost = data.host || '';
         newConfig.smtpPort = data.port || 587;
         newConfig.smtpSecure = data.secure || false;
         newConfig.smtpUsername = data.username || '';
@@ -282,46 +296,46 @@ const Configuration: React.FC = () => {
 
       if (globalDoc.exists()) {
         const data = globalDoc.data();
-        newConfig.followupDelayDays = data.followupDelayDays ?? 7;
-        newConfig.maxFollowups = data.maxFollowups ?? 3;
-        newConfig.dailyEmailLimit = data.dailyEmailLimit ?? 50;
-        newConfig.rateLimitDelaySeconds = data.rateLimitDelaySeconds ?? 60;
-        newConfig.workingHoursStart = data.workingHoursStart ?? 9;
-        newConfig.workingHoursEnd = data.workingHoursEnd ?? 17;
-        newConfig.workingDays = data.workingDays ?? [0, 1, 2, 3, 4];
-        newConfig.timezone = data.timezone || 'UTC';
-        newConfig.onePersonPerCompany = data.onePersonPerCompany ?? true;
-        newConfig.requireEmail = data.requireEmail ?? true;
-        newConfig.excludeBlacklisted = data.excludeBlacklisted ?? true;
+        newConfig.followupDelayDays = data.followupDelayDays ?? 0;
+        newConfig.maxFollowups = data.maxFollowups ?? 0;
+        newConfig.dailyEmailLimit = data.dailyEmailLimit ?? 0;
+        newConfig.rateLimitDelaySeconds = data.rateLimitDelaySeconds ?? 0;
+        newConfig.workingHoursStart = data.workingHoursStart ?? 0;
+        newConfig.workingHoursEnd = data.workingHoursEnd ?? 0;
+        newConfig.workingDays = data.workingDays ?? [];
+        newConfig.timezone = data.timezone || '';
+        newConfig.onePersonPerCompany = data.onePersonPerCompany ?? false;
+        newConfig.requireEmail = data.requireEmail ?? false;
+        newConfig.excludeBlacklisted = data.excludeBlacklisted ?? false;
         newConfig.minCompanySize = data.minCompanySize;
         newConfig.maxCompanySize = data.maxCompanySize;
       }
 
       if (jobRolesDoc.exists()) {
         const data = jobRolesDoc.data();
-        newConfig.targetRoles = data.targetRoles || ['CEO', 'CTO', 'Founder', 'Co-Founder'];
+        newConfig.targetRoles = data.targetRoles || [];
         newConfig.customRoles = data.customRoles || [];
       }
 
       if (enrichmentDoc.exists()) {
         const data = enrichmentDoc.data();
-        newConfig.enrichmentEnabled = data.enabled ?? true;
-        newConfig.enrichmentMaxRetries = data.maxRetries ?? 3;
-        newConfig.enrichmentTimeoutSeconds = data.timeoutSeconds ?? 30;
-        newConfig.enrichmentPromptTemplate = data.promptTemplate || DEFAULT_CONFIG.enrichmentPromptTemplate;
+        newConfig.enrichmentEnabled = data.enabled ?? false;
+        newConfig.enrichmentMaxRetries = data.maxRetries ?? 0;
+        newConfig.enrichmentTimeoutSeconds = data.timeoutSeconds ?? 0;
+        newConfig.enrichmentPromptTemplate = data.promptTemplate || '';
       }
 
       if (emailGenDoc.exists()) {
         const data = emailGenDoc.data();
-        newConfig.emailModel = data.model || 'gpt-4';
-        newConfig.emailMaxTokens = data.maxTokens ?? 500;
-        newConfig.emailTemperature = data.temperature ?? 0.7;
+        newConfig.emailModel = data.model || '';
+        newConfig.emailMaxTokens = data.maxTokens ?? 0;
+        newConfig.emailTemperature = data.temperature ?? 0;
       }
 
       if (promptsDoc.exists()) {
         const data = promptsDoc.data();
-        newConfig.outreachPrompt = data.outreachPrompt || DEFAULT_CONFIG.outreachPrompt;
-        newConfig.followupPrompt = data.followupPrompt || DEFAULT_CONFIG.followupPrompt;
+        newConfig.outreachPrompt = data.outreachPrompt || '';
+        newConfig.followupPrompt = data.followupPrompt || '';
       }
 
       setConfig(newConfig);
@@ -329,6 +343,7 @@ const Configuration: React.FC = () => {
     } catch (error) {
       console.error('Error loading configuration:', error);
       toast.error('Failed to load configuration');
+      setConfigExists(false);
     } finally {
       setIsLoading(false);
     }
@@ -457,6 +472,54 @@ const Configuration: React.FC = () => {
     );
   }
 
+  // Show initialization prompt if config doesn't exist
+  if (!configExists && !isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-white shadow rounded-lg">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center">
+              <CogIcon className="h-8 w-8 text-indigo-600 mr-3" />
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">System Configuration</h1>
+                <p className="text-sm text-gray-600">Initialize your system configuration</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6">
+            <div className="text-center">
+              <ExclamationTriangleIcon className="mx-auto h-12 w-12 text-amber-400" />
+              <h3 className="mt-2 text-sm font-medium text-gray-900">Configuration Not Found</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                Your system configuration hasn't been initialized yet. This is required before you can use the lead generation features.
+              </p>
+              <div className="mt-6">
+                <button
+                  onClick={initializeConfiguration}
+                  disabled={isInitializing}
+                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                >
+                  {isInitializing ? (
+                    <>
+                      <div className="animate-spin -ml-1 mr-3 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                      Initializing...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircleIcon className="-ml-1 mr-2 h-4 w-4" />
+                      Initialize Configuration
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -484,8 +547,15 @@ const Configuration: React.FC = () => {
                 {rawConfigMode ? 'Visual Mode' : 'Raw JSON Mode'}
               </button>
               <button
+                onClick={initializeConfiguration}
+                disabled={isInitializing}
+                className="px-3 py-2 text-sm font-medium text-amber-700 bg-amber-100 border border-amber-300 rounded-md hover:bg-amber-200 focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
+              >
+                {isInitializing ? 'Initializing...' : 'Reinitialize'}
+              </button>
+              <button
                 onClick={rawConfigMode ? saveRawConfiguration : saveConfiguration}
-                disabled={isSaving}
+                disabled={isSaving || !configExists}
                 className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
               >
                 {isSaving ? 'Saving...' : 'Save Configuration'}
@@ -494,18 +564,32 @@ const Configuration: React.FC = () => {
           </div>
         </div>
 
-        {/* Warning Banner */}
-        <div className="bg-amber-50 border-l-4 border-amber-400 p-4">
-          <div className="flex">
-            <ExclamationTriangleIcon className="h-5 w-5 text-amber-400" />
-            <div className="ml-3">
-              <p className="text-sm text-amber-700">
-                <strong>Warning:</strong> Configuration changes can affect system behavior. 
-                Test thoroughly after making changes.
-              </p>
+        {/* Status Banner */}
+        {configExists ? (
+          <div className="bg-green-50 border-l-4 border-green-400 p-4">
+            <div className="flex">
+              <CheckCircleIcon className="h-5 w-5 text-green-400" />
+              <div className="ml-3">
+                <p className="text-sm text-green-700">
+                  <strong>Configuration Loaded:</strong> System configuration loaded from Firestore successfully. 
+                  Changes will be saved back to the database.
+                </p>
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="bg-amber-50 border-l-4 border-amber-400 p-4">
+            <div className="flex">
+              <ExclamationTriangleIcon className="h-5 w-5 text-amber-400" />
+              <div className="ml-3">
+                <p className="text-sm text-amber-700">
+                  <strong>Warning:</strong> Configuration not fully loaded. Please initialize the configuration 
+                  before making changes.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {rawConfigMode ? (

@@ -32,7 +32,10 @@ def database_cleanup(req: https_fn.CallableRequest) -> Dict[str, Any]:
         Dict with cleanup results
     """
     try:
-        dry_run = req.data.get('dry_run', True)
+        # Safely get request data
+        dry_run = True
+        if req.data is not None:
+            dry_run = req.data.get('dry_run', True)
         
         logging.info(f"Database cleanup requested (dry_run={dry_run})")
         
@@ -64,7 +67,10 @@ def database_initialize(req: https_fn.CallableRequest) -> Dict[str, Any]:
         Dict with initialization results
     """
     try:
-        force = req.data.get('force', False)
+        # Safely get request data
+        force = False
+        if req.data is not None:
+            force = req.data.get('force', False)
         
         logging.info(f"Database initialization requested (force={force})")
         
@@ -77,6 +83,8 @@ def database_initialize(req: https_fn.CallableRequest) -> Dict[str, Any]:
         
     except Exception as e:
         logging.error(f"Error in database_initialize: {str(e)}")
+        import traceback
+        logging.error(f"Full traceback: {traceback.format_exc()}")
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.INTERNAL,
             message=f"Failed to initialize database: {str(e)}"
@@ -123,8 +131,12 @@ def database_full_maintenance(req: https_fn.CallableRequest) -> Dict[str, Any]:
         Dict with complete maintenance results
     """
     try:
-        cleanup_dry_run = req.data.get('cleanup_dry_run', True)
-        force_init = req.data.get('force_init', False)
+        # Safely get request data
+        cleanup_dry_run = True
+        force_init = False
+        if req.data is not None:
+            cleanup_dry_run = req.data.get('cleanup_dry_run', True)
+            force_init = req.data.get('force_init', False)
         
         logging.info(f"Full database maintenance requested (cleanup_dry_run={cleanup_dry_run}, force_init={force_init})")
         
@@ -158,7 +170,9 @@ def database_full_maintenance(req: https_fn.CallableRequest) -> Dict[str, Any]:
         # Step 3: Initialization (if needed)
         try:
             # Check if initialization is needed based on health report
-            config_complete = maintenance_results['health_check'].get('configuration_status', {}).get('global_config_complete', False)
+            health_check_data = maintenance_results.get('health_check', {})
+            config_status = health_check_data.get('configuration_status', {}) if health_check_data else {}
+            config_complete = config_status.get('global_config_complete', False) if config_status else False
             
             if not config_complete or force_init:
                 init_result = initialize_database(force=force_init)
