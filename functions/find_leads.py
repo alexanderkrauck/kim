@@ -6,9 +6,26 @@ Enrichment is now handled by the separate enrich_leads function.
 """
 
 import logging
+import sys
+import time
 from typing import Dict, List, Optional, Any
 from firebase_functions import https_fn, options
 from firebase_admin import firestore
+
+# Configure logging for Firebase Functions
+logger = logging.getLogger("firebase_function_logger")
+logger.setLevel(logging.INFO)
+
+# Clear existing handlers to avoid duplicate output in hot reloads
+if logger.hasHandlers():
+    logger.handlers.clear()
+
+# Force output to stdout (not stderr)
+stdout_handler = logging.StreamHandler(stream=sys.stdout)
+stdout_handler.setLevel(logging.INFO)
+stdout_handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
+
+logger.addHandler(stdout_handler)
 
 # Configure European region
 EUROPEAN_REGION = options.SupportedRegion.EUROPE_WEST1
@@ -20,6 +37,7 @@ from utils import (
     get_api_keys,
     get_project_settings
 )
+# Simple logging - just use print() which shows up in Firebase logs
 from config_sync import get_config_sync
 from location_processor import location_processor
 
@@ -40,7 +58,11 @@ def find_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Dict
     Returns:
         Dict with success status, message, and lead data
     """
+    function_name = "find_leads_logic"
+    start_time = time.time()
+    
     try:
+        logger.info(f"Starting find_leads for project: {request_data.get('project_id')}")
         # Extract parameters from request
         project_id = request_data.get('project_id')
         num_leads = request_data.get('num_leads', 25)
@@ -51,7 +73,7 @@ def find_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Dict
         if not project_id:
             raise ValueError("project_id is required")
         
-        logging.info(f"Finding leads for project: {project_id}")
+        logger.info(f"Finding leads for project: {project_id}")
         
         # Get project details from Firestore
         db = get_firestore_client()
@@ -92,7 +114,7 @@ def find_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Dict
         target_roles = effective_config.job_roles.get_all_roles()
         if target_roles:
             apollo_search_params['person_titles'] = target_roles
-            logging.info(f"Targeting job roles: {target_roles}")
+            logger.info(f"Targeting job roles: {target_roles}")
         
         # Add lead filtering parameters
         if effective_config.lead_filter.min_company_size:
@@ -107,10 +129,12 @@ def find_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Dict
         # Merge custom search parameters (these can override config)
         apollo_search_params.update(search_params)
         
-        logging.info(f"Apollo search parameters: {apollo_search_params}")
+        logger.info(f"Searching Apollo with params: {apollo_search_params}")
         
         # Search for leads using Apollo.io
         apollo_results = apollo_client.search_people(**apollo_search_params)
+        
+        logger.info(f"Apollo returned {len(apollo_results.get('people', []))} results")
         
         if not apollo_results.get('people'):
             return {
@@ -123,11 +147,12 @@ def find_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Dict
         
         # Process Apollo results
         processed_leads = lead_processor.process_apollo_results(apollo_results)
-        logging.info(f"Processed {len(processed_leads)} leads from Apollo")
+        logger.info(f"Processed {len(processed_leads)} leads from Apollo")
         
         # Get existing leads for filtering
         existing_leads_query = db.collection('leads').where('projectId', '==', project_id).stream()
         existing_leads = [doc.to_dict() for doc in existing_leads_query]
+        logger.info(f"Found {len(existing_leads)} existing leads in database")
         
         # Get blacklisted emails
         blacklisted_emails = []
@@ -138,7 +163,7 @@ def find_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Dict
                 blacklist_data = blacklist_doc.to_dict()
                 blacklisted_emails = blacklist_data.get('list', [])
         except Exception as e:
-            logging.warning(f"Could not load blacklist: {e}")
+            logger.warning(f"Could not load blacklist: {e}")
         
         # Apply comprehensive lead filtering
         original_count = len(processed_leads)
@@ -155,11 +180,11 @@ def find_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Dict
             len(filtered_leads),
             effective_config.lead_filter
         )
-        logging.info(f"Lead filtering stats: {filter_stats}")
+        logger.info(f"Filtered {original_count} leads down to {len(filtered_leads)}")
         
         # Final duplicate check (this is now mainly for cross-project duplicates)
         unique_leads = lead_processor.check_duplicate_leads(filtered_leads, existing_leads)
-        logging.info(f"Found {len(unique_leads)} unique leads after all filtering")
+        logger.info(f"Found {len(unique_leads)} unique leads after filtering")
         
         # Save leads to Firestore
         saved_count = 0
@@ -182,12 +207,13 @@ def find_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Dict
                 saved_count += 1
                 
             except Exception as e:
-                logging.error(f"Failed to prepare lead for database: {e}")
+                logger.error(f"Failed to prepare lead for database: {e}")
         
         # Commit batch
         enrichment_triggered = False
         if saved_count > 0:
             batch.commit()
+            logger.info(f"Saved {saved_count} leads to database")
             
             # Update project lead count
             current_count = len(existing_leads)
@@ -196,6 +222,7 @@ def find_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Dict
                 'leadCount': new_count,
                 'lastLeadSearch': firestore.SERVER_TIMESTAMP
             })
+            logger.info(f"Updated project lead count to {new_count}")
             
             # Trigger enrichment if requested
             if auto_enrich and api_keys.get('perplexity'):
@@ -214,14 +241,14 @@ def find_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Dict
                     enrichment_result = enrich_leads_logic(enrichment_data, auth_uid)
                     enrichment_triggered = True
                     
-                    logging.info(f"Enrichment triggered: {enrichment_result.get('message', 'Success')}")
+                    logger.info(f"Enrichment triggered: {enrichment_result.get('message', 'Success')}")
                     
                 except Exception as e:
-                    logging.warning(f"Failed to trigger automatic enrichment: {e}")
+                    logger.warning(f"Failed to trigger automatic enrichment: {e}")
                     if not save_without_enrichment:
                         # If we don't want to save without enrichment, rollback
                         # Note: This is complex with Firestore, so we'll just log the error
-                        logging.error("Leads saved but enrichment failed - consider manual enrichment")
+                        logger.error("Leads saved but enrichment failed - consider manual enrichment")
         
         # Return results
         result = {
@@ -238,11 +265,11 @@ def find_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Dict
             'filtering_stats': filter_stats
         }
         
-        logging.info(f"Find leads completed: {result}")
+        logger.info(f"Find leads completed successfully: {saved_count} leads added")
         return result
         
     except Exception as e:
-        logging.error(f"Error in find_leads: {str(e)}")
+        logger.error(f"Error in find_leads: {str(e)}")
         return {
             'success': False,
             'error': str(e),
@@ -278,7 +305,7 @@ def find_leads(req: https_fn.CallableRequest) -> Dict[str, Any]:
         # Re-raise HttpsError as-is
         raise
     except Exception as e:
-        logging.error(f"Error in find_leads Firebase Function: {str(e)}")
+        logger.error(f"Error in find_leads Firebase Function: {str(e)}")
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.INTERNAL,
             message=f"Failed to find leads: {str(e)}"
