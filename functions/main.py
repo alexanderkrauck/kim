@@ -2,16 +2,23 @@
 # To get started, simply uncomment the below code or create your own.
 # Deploy with `firebase deploy`
 
-from firebase_functions import https_fn, firestore_fn
+from firebase_functions import https_fn, firestore_fn, options
 from firebase_admin import initialize_app, firestore
 from datetime import datetime, timedelta
 import logging
+
+# Configure European region
+EUROPEAN_REGION = options.SupportedRegion.EUROPE_WEST1
 
 # Import new functions
 from find_leads import find_leads
 from contact_leads import contact_leads
 from enrich_leads import enrich_leads, get_enrichment_status
+from email_generation import generate_emails, preview_email
+from config_management import get_global_config, update_global_config, get_project_config, update_project_config
 from test_apis import test_apis, validate_api_keys, get_api_status
+from job_role_config import get_job_roles_config, update_job_roles_config, get_available_job_roles
+from database_functions import database_cleanup, database_initialize, database_health_check, database_full_maintenance
 
 # Initialize Firebase Admin
 initialize_app()
@@ -22,16 +29,29 @@ __all__ = [
     'contact_leads', 
     'enrich_leads',
     'get_enrichment_status',
+    'generate_emails',
+    'preview_email',
+    'get_global_config',
+    'update_global_config',
+    'get_project_config',
+    'update_project_config',
     'test_apis',
     'validate_api_keys',
     'get_api_status',
+    'get_job_roles_config',
+    'update_job_roles_config', 
+    'get_available_job_roles',
+    'database_cleanup',
+    'database_initialize',
+    'database_health_check',
+    'database_full_maintenance',
     'trigger_followup', 
     'process_all_followups', 
     'on_lead_created', 
     'health_check'
 ]
 
-@https_fn.on_call()
+@https_fn.on_call(region=EUROPEAN_REGION)
 def trigger_followup(req: https_fn.CallableRequest) -> dict:
     """
     Manually trigger a follow-up for a specific lead
@@ -97,7 +117,7 @@ def trigger_followup(req: https_fn.CallableRequest) -> dict:
             message=str(e)
         )
 
-@https_fn.on_call()
+@https_fn.on_call(region=EUROPEAN_REGION)
 def process_all_followups(req: https_fn.CallableRequest) -> dict:
     """
     Process all eligible leads for follow-ups based on delay settings
@@ -176,7 +196,7 @@ def process_all_followups(req: https_fn.CallableRequest) -> dict:
             message=str(e)
         )
 
-@firestore_fn.on_document_created(document="leads/{leadId}")
+@firestore_fn.on_document_created(document="leads/{leadId}", region=EUROPEAN_REGION)
 def on_lead_created(event: firestore_fn.Event[firestore_fn.DocumentSnapshot]) -> None:
     """
     Triggered when a new lead is created
@@ -193,7 +213,7 @@ def on_lead_created(event: firestore_fn.Event[firestore_fn.DocumentSnapshot]) ->
     except Exception as e:
         logging.error(f"Error processing new lead: {str(e)}")
 
-@https_fn.on_request()
+@https_fn.on_request(region=EUROPEAN_REGION)
 def health_check(req: https_fn.Request) -> https_fn.Response:
     """
     Simple health check endpoint

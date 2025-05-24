@@ -7,8 +7,11 @@ This function handles outreach and follow-up emails for leads in a project.
 import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
-from firebase_functions import https_fn
+from firebase_functions import https_fn, options
 from firebase_admin import firestore
+
+# Configure European region
+EUROPEAN_REGION = options.SupportedRegion.EUROPE_WEST1
 
 from utils import (
     OpenAIClient,
@@ -19,39 +22,37 @@ from utils import (
     get_project_prompts,
     format_email_content
 )
+from config_sync import get_config_sync
 
 
-@https_fn.on_call()
-def contact_leads(req: https_fn.CallableRequest) -> Dict[str, Any]:
+def contact_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Dict[str, Any]:
     """
-    Send outreach or follow-up emails to leads in a project
+    Business logic for contacting leads - separated from Firebase Functions decorator
     
     Args:
-        req.data should contain:
+        request_data: Dictionary containing:
         - project_id (str): ID of the project
         - email_type (str, optional): 'outreach' or 'followup' (default: 'auto')
         - lead_ids (list, optional): Specific lead IDs to contact
         - dry_run (bool, optional): If True, generate emails but don't send
+        auth_uid: User ID from Firebase Auth (optional)
         
     Returns:
         Dict with success status, message, and email statistics
     """
     try:
         # Extract parameters from request
-        project_id = req.data.get('project_id')
-        email_type = req.data.get('email_type', 'auto')  # 'outreach', 'followup', or 'auto'
-        lead_ids = req.data.get('lead_ids', [])
-        dry_run = req.data.get('dry_run', False)
+        project_id = request_data.get('project_id')
+        email_type = request_data.get('email_type', 'auto')  # 'outreach', 'followup', or 'auto'
+        lead_ids = request_data.get('lead_ids', [])
+        dry_run = request_data.get('dry_run', False)
         
         if not project_id:
             raise ValueError("project_id is required")
         
         logging.info(f"Contacting leads for project: {project_id}, type: {email_type}")
         
-        # TODO: Get project details and settings
-        # - Fetch project document
-        # - Get project-specific or global settings (timing, prompts)
-        # - Get project-specific or global email prompts
+        # Get project details and settings
         db = get_firestore_client()
         project_ref = db.collection('projects').document(project_id)
         project_doc = project_ref.get()
@@ -60,13 +61,14 @@ def contact_leads(req: https_fn.CallableRequest) -> Dict[str, Any]:
             raise ValueError(f"Project {project_id} not found")
         
         project_data = project_doc.to_dict()
-        project_settings = get_project_settings(project_id)
-        project_prompts = get_project_prompts(project_id)
         
-        # TODO: Initialize API clients
-        # - Get API keys from Firebase or environment
-        # - Initialize OpenAI client for email generation
-        # - Initialize Email service for sending
+        # Load project configuration
+        config_sync = get_config_sync()
+        project_config = config_sync.load_project_config_from_firebase(project_id)
+        global_config = config_sync.load_global_config_from_firebase()
+        effective_config = project_config.get_effective_config(global_config)
+        
+        # Initialize API clients
         api_keys = get_api_keys()
         
         if not api_keys.get('openai'):
@@ -79,12 +81,7 @@ def contact_leads(req: https_fn.CallableRequest) -> Dict[str, Any]:
         if not email_service.test_connection():
             raise ValueError("Failed to connect to email service")
         
-        # TODO: Determine which leads to contact
-        # - If lead_ids provided, use those specific leads
-        # - If email_type is 'outreach', find leads with status 'new'
-        # - If email_type is 'followup', find leads eligible for follow-up
-        # - If email_type is 'auto', determine based on lead status and timing
-        
+        # Determine which leads to contact
         leads_to_contact = []
         
         if lead_ids:
@@ -94,11 +91,18 @@ def contact_leads(req: https_fn.CallableRequest) -> Dict[str, Any]:
                 if lead_doc.exists:
                     lead_data = lead_doc.to_dict()
                     lead_data['id'] = lead_id
-                    leads_to_contact.append(lead_data)
+                    
+                    # Check if lead belongs to the project
+                    if lead_data.get('projectId') == project_id:
+                        leads_to_contact.append(lead_data)
+                    else:
+                        logging.warning(f"Lead {lead_id} does not belong to project {project_id}")
+                else:
+                    logging.warning(f"Lead {lead_id} not found")
         else:
             # Find leads based on email type and criteria
             leads_to_contact = find_eligible_leads(
-                db, project_id, email_type, project_settings
+                db, project_id, email_type, effective_config.scheduling
             )
         
         logging.info(f"Found {len(leads_to_contact)} leads to contact")
@@ -111,10 +115,7 @@ def contact_leads(req: https_fn.CallableRequest) -> Dict[str, Any]:
                 'emails_failed': 0
             }
         
-        # TODO: Check blacklist
-        # - Load global blacklist
-        # - Load project-specific blacklist
-        # - Filter out blacklisted leads
+        # Check blacklist
         blacklisted_emails = get_blacklisted_emails(db, project_id)
         
         # Filter out blacklisted leads
@@ -127,12 +128,7 @@ def contact_leads(req: https_fn.CallableRequest) -> Dict[str, Any]:
         
         logging.info(f"After blacklist filter: {len(eligible_leads)} eligible leads")
         
-        # TODO: Generate emails for each lead
-        # - Determine email type for each lead (outreach vs followup)
-        # - Use OpenAI to generate personalized content
-        # - Apply project-specific or global prompts
-        # - Format emails with lead data
-        
+        # Generate emails for each lead
         emails_to_send = []
         generation_errors = []
         
@@ -141,8 +137,11 @@ def contact_leads(req: https_fn.CallableRequest) -> Dict[str, Any]:
                 # Determine actual email type for this lead
                 actual_email_type = determine_email_type(lead, email_type)
                 
-                # Get appropriate prompt
-                prompt = get_email_prompt(project_prompts, actual_email_type)
+                # Get appropriate prompt from configuration
+                if actual_email_type == 'followup':
+                    prompt = effective_config.email_generation.followup_prompt
+                else:
+                    prompt = effective_config.email_generation.outreach_prompt
                 
                 # Generate email content
                 email_content = openai_client.generate_email_content(
@@ -176,12 +175,7 @@ def contact_leads(req: https_fn.CallableRequest) -> Dict[str, Any]:
         
         logging.info(f"Generated {len(emails_to_send)} emails")
         
-        # TODO: Send emails (unless dry_run)
-        # - Send emails using EmailService
-        # - Track success/failure for each email
-        # - Update lead status and lastContacted
-        # - Create email records in database
-        
+        # Send emails (unless dry_run)
         sent_count = 0
         failed_count = 0
         
@@ -220,11 +214,7 @@ def contact_leads(req: https_fn.CallableRequest) -> Dict[str, Any]:
                     failed_count += 1
                     logging.error(f"Error sending email to {email_data['to_email']}: {e}")
         
-        # TODO: Return results
-        # - Summary of emails sent/failed
-        # - Any generation errors
-        # - Processing statistics
-        
+        # Return results
         result = {
             'success': True,
             'message': f'Email campaign completed: {sent_count} sent, {failed_count} failed',
@@ -243,24 +233,53 @@ def contact_leads(req: https_fn.CallableRequest) -> Dict[str, Any]:
         
     except Exception as e:
         logging.error(f"Error in contact_leads: {str(e)}")
+        return {
+            'success': False,
+            'error': str(e),
+            'error_type': type(e).__name__
+        }
+
+
+@https_fn.on_call(region=EUROPEAN_REGION)
+def contact_leads(req: https_fn.CallableRequest) -> Dict[str, Any]:
+    """
+    Firebase Functions wrapper for contacting leads
+    
+    Args:
+        req: Firebase Functions CallableRequest
+        
+    Returns:
+        Dict with success status, message, and email statistics
+    """
+    try:
+        auth_uid = req.auth.uid if req.auth else None
+        result = contact_leads_logic(req.data, auth_uid)
+        
+        # If there was an error in business logic, convert to HttpsError
+        if not result.get('success', True):
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.INTERNAL,
+                message=result.get('error', 'Unknown error')
+            )
+        
+        return result
+        
+    except https_fn.HttpsError:
+        # Re-raise HttpsError as-is
+        raise
+    except Exception as e:
+        logging.error(f"Error in contact_leads Firebase Function: {str(e)}")
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.INTERNAL,
             message=f"Failed to contact leads: {str(e)}"
         )
 
 
-# TODO: Helper functions to implement:
+# Helper functions
 
-def find_eligible_leads(db, project_id: str, email_type: str, settings: Dict) -> List[Dict]:
+def find_eligible_leads(db, project_id: str, email_type: str, scheduling_config) -> List[Dict]:
     """
     Find leads eligible for contact based on type and timing
-    
-    TODO: Implement lead eligibility logic
-    - For 'outreach': leads with status 'new'
-    - For 'followup': leads with status 'emailed' and past follow-up delay
-    - For 'auto': determine based on status and timing
-    - Respect max follow-up limits
-    - Check timing constraints
     """
     eligible_leads = []
     
@@ -274,8 +293,8 @@ def find_eligible_leads(db, project_id: str, email_type: str, settings: Dict) ->
     
     if email_type in ['followup', 'auto']:
         # Find leads eligible for follow-up
-        followup_delay_days = settings.get('followupDelayDays', 7)
-        max_followups = settings.get('maxFollowups', 3)
+        followup_delay_days = scheduling_config.followup_delay_days
+        max_followups = scheduling_config.max_followups
         cutoff_date = datetime.now() - timedelta(days=followup_delay_days)
         
         # Query leads that might need follow-up
@@ -300,11 +319,6 @@ def find_eligible_leads(db, project_id: str, email_type: str, settings: Dict) ->
 def get_blacklisted_emails(db, project_id: str) -> set:
     """
     Get all blacklisted emails (global + project-specific)
-    
-    TODO: Implement blacklist retrieval
-    - Load global blacklist
-    - Load project-specific blacklist
-    - Return combined set of blacklisted emails
     """
     blacklisted = set()
     
@@ -332,11 +346,6 @@ def get_blacklisted_emails(db, project_id: str) -> set:
 def determine_email_type(lead: Dict, requested_type: str) -> str:
     """
     Determine actual email type based on lead status and request
-    
-    TODO: Implement email type determination logic
-    - If requested_type is specific, validate against lead status
-    - If 'auto', determine based on lead status and history
-    - Return 'outreach' or 'followup'
     """
     if requested_type in ['outreach', 'followup']:
         return requested_type
@@ -351,29 +360,9 @@ def determine_email_type(lead: Dict, requested_type: str) -> str:
         return 'followup'
 
 
-def get_email_prompt(prompts: Dict, email_type: str) -> str:
-    """
-    Get appropriate email prompt based on type
-    
-    TODO: Implement prompt selection logic
-    - Return outreachPrompt for outreach emails
-    - Return followupPrompt for follow-up emails
-    - Handle missing prompts gracefully
-    """
-    if email_type == 'followup':
-        return prompts.get('followupPrompt', '')
-    else:
-        return prompts.get('outreachPrompt', '')
-
-
 def generate_email_subject(lead: Dict, email_type: str) -> str:
     """
     Generate appropriate email subject line
-    
-    TODO: Implement subject line generation
-    - Create personalized subject lines
-    - Different patterns for outreach vs follow-up
-    - Include company name when available
     """
     company = lead.get('company', '')
     name = lead.get('name', '').split()[0] if lead.get('name') else ''
@@ -395,12 +384,6 @@ def generate_email_subject(lead: Dict, email_type: str) -> str:
 def update_lead_after_email(db, lead_id: str, email_type: str, project_id: str):
     """
     Update lead status after sending email
-    
-    TODO: Implement lead status update logic
-    - Update status to 'emailed'
-    - Set lastContacted to current time
-    - Increment followupCount for follow-ups
-    - Handle errors gracefully
     """
     try:
         lead_ref = db.collection('leads').document(lead_id)
@@ -426,11 +409,6 @@ def update_lead_after_email(db, lead_id: str, email_type: str, project_id: str):
 def create_email_record(db, email_data: Dict, project_id: str):
     """
     Create email record in database
-    
-    TODO: Implement email record creation
-    - Store email details for tracking
-    - Link to lead and project
-    - Include timestamp and status
     """
     try:
         email_record = {

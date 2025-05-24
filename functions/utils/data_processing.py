@@ -6,6 +6,7 @@ import re
 import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime
+from config_model import LeadFilterConfig
 
 
 class DataValidator:
@@ -279,4 +280,239 @@ class LeadProcessor:
             else:
                 logging.info(f"Duplicate lead found: {lead.get('email')}")
         
-        return unique_leads 
+        return unique_leads
+    
+    def apply_lead_filters(self, 
+                          leads: List[Dict[str, Any]], 
+                          filter_config: LeadFilterConfig,
+                          existing_leads: List[Dict[str, Any]] = None,
+                          blacklisted_emails: List[str] = None) -> List[Dict[str, Any]]:
+        """
+        Apply comprehensive lead filtering based on configuration
+        
+        Args:
+            leads: List of leads to filter
+            filter_config: Lead filter configuration
+            existing_leads: Existing leads for duplicate checking
+            blacklisted_emails: List of blacklisted email addresses
+            
+        Returns:
+            List of filtered leads
+        """
+        if not leads:
+            return []
+        
+        filtered_leads = []
+        company_tracker = {}
+        
+        existing_leads = existing_leads or []
+        blacklisted_emails = blacklisted_emails or []
+        blacklisted_set = {email.lower() for email in blacklisted_emails}
+        
+        for lead in leads:
+            # Filter by email requirement
+            if filter_config.require_email and not lead.get('email'):
+                logging.debug(f"Filtered lead without email: {lead.get('name', 'Unknown')}")
+                continue
+            
+            # Filter blacklisted emails
+            if filter_config.exclude_blacklisted and lead.get('email'):
+                if lead['email'].lower() in blacklisted_set:
+                    logging.debug(f"Filtered blacklisted email: {lead['email']}")
+                    continue
+            
+            # Filter one person per company
+            if filter_config.one_person_per_company and lead.get('company'):
+                company_name = self._normalize_company_name(lead['company'])
+                
+                # Check if we already have someone from this company
+                if company_name in company_tracker:
+                    logging.debug(f"Filtered duplicate company: {lead['company']}")
+                    continue
+                
+                # Check against existing leads
+                if any(self._normalize_company_name(existing_lead.get('company', '')) == company_name 
+                       for existing_lead in existing_leads):
+                    logging.debug(f"Filtered company already in existing leads: {lead['company']}")
+                    continue
+                
+                company_tracker[company_name] = True
+            
+            # Filter by company size (if data is available)
+            if self._should_filter_by_company_size(lead, filter_config):
+                logging.debug(f"Filtered by company size: {lead.get('company', 'Unknown')}")
+                continue
+            
+            # Add additional quality filters
+            if not self._passes_quality_filters(lead):
+                logging.debug(f"Filtered by quality checks: {lead.get('email', 'Unknown')}")
+                continue
+            
+            filtered_leads.append(lead)
+        
+        logging.info(f"Lead filtering results: {len(leads)} -> {len(filtered_leads)} after applying filters")
+        return filtered_leads
+    
+    def _normalize_company_name(self, company_name: str) -> str:
+        """
+        Normalize company name for comparison
+        
+        Args:
+            company_name: Raw company name
+            
+        Returns:
+            Normalized company name
+        """
+        if not company_name:
+            return ""
+        
+        # Convert to lowercase and strip whitespace
+        normalized = company_name.lower().strip()
+        
+        # Remove common suffixes and prefixes
+        suffixes = ['inc', 'corp', 'corporation', 'llc', 'ltd', 'limited', 'co', 'company']
+        prefixes = ['the ']
+        
+        for prefix in prefixes:
+            if normalized.startswith(prefix):
+                normalized = normalized[len(prefix):]
+        
+        for suffix in suffixes:
+            patterns = [f' {suffix}', f' {suffix}.', f', {suffix}', f', {suffix}.']
+            for pattern in patterns:
+                if normalized.endswith(pattern):
+                    normalized = normalized[:-len(pattern)]
+                    break
+        
+        return normalized.strip()
+    
+    def _should_filter_by_company_size(self, lead: Dict[str, Any], filter_config: LeadFilterConfig) -> bool:
+        """
+        Check if lead should be filtered based on company size
+        
+        Args:
+            lead: Lead data
+            filter_config: Filter configuration
+            
+        Returns:
+            True if lead should be filtered out
+        """
+        # If no size filters configured, don't filter
+        if not filter_config.min_company_size and not filter_config.max_company_size:
+            return False
+        
+        # Try to extract company size from raw Apollo data
+        company_size = None
+        raw_data = lead.get('raw_data', {})
+        
+        if raw_data and isinstance(raw_data, dict):
+            organization = raw_data.get('organization', {})
+            if organization:
+                # Apollo provides estimated employee count
+                company_size = organization.get('estimated_num_employees')
+                
+                # Also check for employee range
+                if not company_size:
+                    emp_ranges = organization.get('num_employees_ranges', [])
+                    if emp_ranges:
+                        # Parse range like "1-10" or "11-50"
+                        range_str = emp_ranges[0]
+                        if '-' in range_str:
+                            try:
+                                min_emp = int(range_str.split('-')[0])
+                                company_size = min_emp
+                            except (ValueError, IndexError):
+                                pass
+        
+        # If we couldn't determine size, don't filter
+        if company_size is None:
+            return False
+        
+        # Apply size filters
+        if filter_config.min_company_size and company_size < filter_config.min_company_size:
+            return True
+        
+        if filter_config.max_company_size and company_size > filter_config.max_company_size:
+            return True
+        
+        return False
+    
+    def _passes_quality_filters(self, lead: Dict[str, Any]) -> bool:
+        """
+        Apply basic quality filters to leads
+        
+        Args:
+            lead: Lead data
+            
+        Returns:
+            True if lead passes quality checks
+        """
+        # Filter out generic/role emails
+        email = lead.get('email', '').lower()
+        generic_patterns = [
+            'info@', 'contact@', 'support@', 'help@', 'sales@',
+            'admin@', 'webmaster@', 'postmaster@', 'noreply@',
+            'no-reply@', 'donotreply@', 'marketing@'
+        ]
+        
+        if any(email.startswith(pattern) for pattern in generic_patterns):
+            return False
+        
+        # Filter out temporary/disposable email domains
+        disposable_domains = [
+            '10minutemail.com', 'guerrillamail.com', 'tempmail.org',
+            'mailinator.com', 'dispostable.com'
+        ]
+        
+        email_domain = email.split('@')[-1] if '@' in email else ''
+        if email_domain in disposable_domains:
+            return False
+        
+        # Require minimum name length (if name is provided)
+        name = lead.get('name', '').strip()
+        if name and len(name) < 2:
+            return False
+        
+        # Filter out obviously invalid names
+        if name:
+            # Check for common test names
+            test_names = ['test', 'demo', 'sample', 'example', 'admin', 'user']
+            if name.lower() in test_names:
+                return False
+            
+            # Check for names that are too generic
+            if len(name.split()) == 1 and len(name) < 3:
+                return False
+        
+        return True
+    
+    def get_filtering_stats(self, 
+                           original_count: int, 
+                           filtered_count: int,
+                           filter_config: LeadFilterConfig) -> Dict[str, Any]:
+        """
+        Generate filtering statistics
+        
+        Args:
+            original_count: Number of leads before filtering
+            filtered_count: Number of leads after filtering
+            filter_config: Filter configuration used
+            
+        Returns:
+            Dictionary with filtering statistics
+        """
+        filtered_out = original_count - filtered_count
+        filter_rate = (filtered_out / original_count * 100) if original_count > 0 else 0
+        
+        return {
+            'original_count': original_count,
+            'filtered_count': filtered_count,
+            'filtered_out': filtered_out,
+            'filter_rate_percent': round(filter_rate, 2),
+            'filters_applied': {
+                'require_email': filter_config.require_email,
+                'exclude_blacklisted': filter_config.exclude_blacklisted,
+                'one_person_per_company': filter_config.one_person_per_company,
+                'company_size_filter': bool(filter_config.min_company_size or filter_config.max_company_size)
+            }
+        } 

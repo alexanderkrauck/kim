@@ -1,0 +1,39 @@
+{
+  "timestamp": "2025-05-24T09:58:41.186815",
+  "summary": {
+    "total": 7,
+    "passed": 6,
+    "failed": 1,
+    "errors": 0
+  },
+  "results": {
+    "API Connectivity": {
+      "status": "PASS",
+      "details": {}
+    },
+    "Configuration Management": {
+      "status": "FAIL",
+      "details": {}
+    },
+    "Lead Finding": {
+      "status": "PASS",
+      "details": {}
+    },
+    "Lead Enrichment": {
+      "status": "PASS",
+      "details": {}
+    },
+    "Email Generation": {
+      "status": "PASS",
+      "details": {}
+    },
+    "Email Preview": {
+      "status": "PASS",
+      "details": {}
+    },
+    "Contact Leads (Dry Run)": {
+      "status": "PASS",
+      "details": {}
+    }
+  }
+}

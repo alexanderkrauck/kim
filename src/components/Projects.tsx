@@ -31,10 +31,24 @@ const Projects: React.FC<ProjectsProps> = ({ onSelectProject, selectedProject })
   const [activeSettingsTab, setActiveSettingsTab] = useState<'details' | 'guidelines' | 'timing'>('details');
   const [activeGlobalTab, setActiveGlobalTab] = useState<'guidelines' | 'timing'>('guidelines');
   
-  const [newProject, setNewProject] = useState({
+  const [newProject, setNewProject] = useState<{
+    name: string;
+    areaDescription: string;
+    projectDetails: string;
+    location: {
+      rawLocation: string;
+      apolloLocationIds: string[];
+      useLlmParsing: boolean;
+    };
+  }>({
     name: '',
     areaDescription: '',
     projectDetails: '',
+    location: {
+      rawLocation: '',
+      apolloLocationIds: [] as string[],
+      useLlmParsing: true
+    }
   });
 
   const [editingProject, setEditingProject] = useState<Project | null>(null);
@@ -200,7 +214,9 @@ const Projects: React.FC<ProjectsProps> = ({ onSelectProject, selectedProject })
     setCreating(true);
     try {
       const projectData = {
-        ...newProject,
+        name: newProject.name,
+        areaDescription: newProject.areaDescription,
+        projectDetails: newProject.projectDetails,
         emailConsiderations: '',
         followupConsiderations: '',
         createdAt: new Date(),
@@ -210,6 +226,16 @@ const Projects: React.FC<ProjectsProps> = ({ onSelectProject, selectedProject })
       };
 
       const docRef = await addDoc(collection(db, 'projects'), projectData);
+      
+      // Save location configuration separately
+      if (newProject.location.rawLocation || newProject.location.apolloLocationIds.length > 0) {
+        const locationRef = doc(db, 'settings', `project_${docRef.id}_location`);
+        await setDoc(locationRef, {
+          rawLocation: newProject.location.rawLocation,
+          apolloLocationIds: newProject.location.apolloLocationIds,
+          useLlmParsing: newProject.location.useLlmParsing
+        });
+      }
       const createdProject: Project = {
         id: docRef.id,
         ...projectData,
@@ -220,6 +246,11 @@ const Projects: React.FC<ProjectsProps> = ({ onSelectProject, selectedProject })
         name: '',
         areaDescription: '',
         projectDetails: '',
+        location: {
+          rawLocation: '',
+          apolloLocationIds: [] as string[],
+          useLlmParsing: true
+        }
       });
       setShowCreateForm(false);
       toast.success('Project created successfully!');
@@ -811,6 +842,77 @@ const Projects: React.FC<ProjectsProps> = ({ onSelectProject, selectedProject })
                   <p className="mt-1 text-sm text-gray-500">
                     {newProject.projectDetails.length}/5000 characters
                   </p>
+                </div>
+
+                {/* Location Configuration */}
+                <div className="border-t border-gray-200 pt-4">
+                  <h4 className="text-md font-medium text-gray-900 mb-3">Location Configuration</h4>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Configure the target location for lead finding. This helps narrow down leads to specific geographic areas.
+                  </p>
+                  
+                  <div className="space-y-4">
+                    <div className="flex items-center">
+                      <input
+                        id="useLlmParsing"
+                        type="checkbox"
+                        checked={newProject.location.useLlmParsing}
+                        onChange={(e) => setNewProject(prev => ({ 
+                          ...prev, 
+                          location: { ...prev.location, useLlmParsing: e.target.checked }
+                        }))}
+                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="useLlmParsing" className="ml-2 block text-sm font-medium text-gray-700">
+                        Use AI to parse location (recommended)
+                      </label>
+                    </div>
+
+                    {newProject.location.useLlmParsing ? (
+                      <div>
+                        <label htmlFor="rawLocation" className="block text-sm font-medium text-gray-700">
+                          Target Location
+                        </label>
+                        <input
+                          type="text"
+                          id="rawLocation"
+                          value={newProject.location.rawLocation}
+                          onChange={(e) => setNewProject(prev => ({ 
+                            ...prev, 
+                            location: { ...prev.location, rawLocation: e.target.value }
+                          }))}
+                          className="mt-1 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                          placeholder="e.g., San Francisco Bay Area, California"
+                        />
+                        <p className="mt-1 text-sm text-gray-500">
+                          Enter a natural location description (city, state, region, etc.). AI will parse this for lead targeting.
+                        </p>
+                      </div>
+                    ) : (
+                      <div>
+                        <label htmlFor="apolloLocationIds" className="block text-sm font-medium text-gray-700">
+                          Apollo Location IDs
+                        </label>
+                        <input
+                          type="text"
+                          id="apolloLocationIds"
+                          value={newProject.location.apolloLocationIds.join(', ')}
+                          onChange={(e) => setNewProject(prev => ({ 
+                            ...prev, 
+                            location: { 
+                              ...prev.location, 
+                              apolloLocationIds: e.target.value.split(',').map(id => id.trim()).filter(id => id) as string[]
+                            }
+                          }))}
+                          className="mt-1 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                          placeholder="e.g., 5391959, 5332921"
+                        />
+                        <p className="mt-1 text-sm text-gray-500">
+                          Enter Apollo.io location IDs separated by commas. Find these in Apollo's location search.
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 

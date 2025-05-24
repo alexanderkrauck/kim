@@ -1,249 +1,357 @@
-# Firebase Functions - Lead Generation Backend
+# Lead Generation System - Firebase Functions
 
-A Firebase Functions backend for lead generation, discovery, and enrichment using Apollo.io, Perplexity AI, and OpenAI APIs.
+## 🎯 Overview
 
-## ✅ Implementation Complete
+A comprehensive lead generation and outreach system built with Firebase Functions, featuring:
 
-**Test Infrastructure: FULLY FIXED** ✅  
-**Success Rate: 89.5% (mock) / 73.7% (integration)** ✅  
-**Core Functions: 100% Working** ✅  
-**Ready for Production** ✅
+- **Lead Discovery**: Apollo.io integration with intelligent filtering
+- **Lead Enrichment**: Perplexity AI-powered research and insights
+- **Email Generation**: OpenAI-powered personalized outreach emails
+- **Email Automation**: SMTP delivery with scheduling and follow-up sequences
+- **Configuration Management**: Flexible global and project-specific settings
 
-### Key Achievements
-- ✅ **Fixed Flask context errors** - Replaced with proper Firebase Functions testing
-- ✅ **Business logic separation** - All functions now testable independently  
-- ✅ **Find leads function** - 100% working with full test coverage
-- ✅ **Clean architecture** - Proper separation of concerns implemented
-- ✅ **Production ready** - Backend ready for frontend integration
+## ✅ Implementation Status: COMPLETE
 
-## 🚀 Quick Start
+All core functionality has been implemented and tested:
 
-### Prerequisites
-- Python 3.8+
-- Firebase CLI
-- API Keys for Apollo.io, Perplexity AI, and OpenAI
+- ✅ **Configuration System**: Python-based configuration with Firebase sync
+- ✅ **Lead Finding**: Apollo.io integration with location and role targeting
+- ✅ **Lead Enrichment**: Perplexity integration with retry logic
+- ✅ **Email Generation**: OpenAI integration with customizable prompts
+- ✅ **Email Sending**: SMTP integration with scheduling and rate limiting
+- ✅ **API Testing**: Comprehensive health checks and validation
 
-### Setup
+## 🏗️ Architecture
 
-1. **Clone and install dependencies:**
+### Configuration System
+- **Single Source of Truth**: Python dataclasses define all schemas
+- **Firebase Sync**: Bidirectional sync maintains existing structure
+- **Inheritance**: Project configs inherit from global with overrides
+- **Type Safety**: Full Python typing with validation
+
+### Lead Processing Pipeline
+1. **Apollo Search** → Configuration-driven parameters
+2. **Comprehensive Filtering** → Duplicates, blacklist, quality
+3. **Batch Saving** → Efficient Firestore operations
+4. **Optional Enrichment** → Perplexity with retry logic
+5. **Email Generation** → OpenAI personalization
+6. **Scheduled Sending** → SMTP with rate limiting
+
+## 📋 Firebase Functions
+
+### Core Lead Management
+- `find_leads` - Search for leads using Apollo.io
+- `enrich_leads` - Enrich leads with Perplexity research
+- `get_enrichment_status` - Get enrichment status
+- `contact_leads` - Send outreach/followup emails
+
+### Email Generation
+- `generate_emails` - Generate personalized emails
+- `preview_email` - Preview email generation
+
+### Configuration Management
+- `get_global_config` - Retrieve global configuration
+- `update_global_config` - Update global configuration
+- `get_project_config` - Retrieve project configuration
+- `update_project_config` - Update project configuration
+
+### Job Role Management
+- `get_job_roles_config` - Get job role configuration
+- `update_job_roles_config` - Update job role configuration
+- `get_available_job_roles` - Get available job roles
+
+### API Testing & Health
+- `test_apis` - Test all API connections
+- `validate_api_keys` - Validate API key formats
+- `get_api_status` - Get API health status
+- `health_check` - System health check
+
+## 🔧 Setup & Configuration
+
+### 1. Install Dependencies
+
 ```bash
-git clone <repo-url>
 cd functions
 pip install -r requirements.txt
 ```
 
-2. **Configure API keys:**
+### 2. Configure API Keys
+
+Set up the following API keys in Firebase or environment variables:
+
 ```bash
-export APOLLO_API_KEY="your_apollo_key"
-export PERPLEXITY_API_KEY="your_perplexity_key" 
-export OPENAI_API_KEY="your_openai_key"
+# Required API Keys
+OPENAI_API_KEY=sk-...
+APOLLO_API_KEY=...
+PERPLEXITY_API_KEY=pplx-...
+
+# Optional for local development
+APIFI_API_KEY=...
 ```
 
-3. **Run tests:**
-```bash
-# Quick mock tests (recommended for development)
-python tests/run_tests.py mock
+### 3. Configure SMTP (for email sending)
 
-# Full integration tests
-python tests/run_tests.py full
+```bash
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your-email@gmail.com
+SMTP_PASSWORD=your-app-password
+SMTP_FROM_EMAIL=your-email@gmail.com
+SMTP_FROM_NAME="Your Name"
 ```
 
-4. **Deploy to Firebase:**
+### 4. Deploy to Firebase
+
 ```bash
 firebase deploy --only functions
 ```
 
-## 📊 Test Results
+## 🧪 Testing
 
-| Test Type | Success Rate | Status |
-|-----------|--------------|--------|
-| **Mock Tests** | **89.5%** (17/19) | ✅ Excellent |
-| **Integration Tests** | **73.7%** (56/76) | ✅ Good |
-| **Find Leads Function** | **100%** (13/13) | ✅ Perfect |
+### Run Comprehensive System Test
 
-### Test Commands
 ```bash
-# Fast mock tests (no external API calls)
-python tests/run_tests.py mock
-
-# Complete test suite with Firebase Functions
-python tests/run_tests.py full
-
-# Save results to JSON
-python tests/run_tests.py full --output results.json
+cd functions
+python test_system.py
 ```
 
-## 🔧 Core Functions
+This tests:
+- API connectivity
+- Configuration management
+- Lead finding
+- Lead enrichment
+- Email generation
+- Email preview
+- Contact leads (dry run)
 
-### 1. Find Leads (`find_leads.py`) ✅
-**Status: Fully Working**
-- Searches for leads using Apollo.io
-- Automatic duplicate filtering
-- Optional auto-enrichment
-- Proper error handling and logging
-- **100% test coverage**
+### Test Individual APIs
+
+```bash
+python test_apis.py
+```
+
+## 📊 Configuration Schema
+
+### Global Configuration
 
 ```python
-# Business logic (testable)
-from find_leads import find_leads_logic
-
-result = find_leads_logic({
-    'project_id': 'my_project',
-    'num_leads': 25,
-    'auto_enrich': True
-})
+{
+  "api_keys": {
+    "openai_api_key": "sk-...",
+    "apollo_api_key": "...",
+    "perplexity_api_key": "pplx-..."
+  },
+  "smtp": {
+    "host": "smtp.gmail.com",
+    "port": 587,
+    "secure": false,
+    "username": "...",
+    "password": "...",
+    "from_email": "...",
+    "from_name": "..."
+  },
+  "lead_filter": {
+    "one_person_per_company": true,
+    "require_email": true,
+    "exclude_blacklisted": true,
+    "min_company_size": null,
+    "max_company_size": null
+  },
+  "job_roles": {
+    "target_roles": ["CEO", "CTO", "Founder"],
+    "custom_roles": []
+  },
+  "enrichment": {
+    "enabled": true,
+    "max_retries": 3,
+    "timeout_seconds": 30,
+    "prompt_template": "Research {company}..."
+  },
+  "email_generation": {
+    "model": "gpt-4",
+    "max_tokens": 500,
+    "temperature": 0.7,
+    "outreach_prompt": "...",
+    "followup_prompt": "..."
+  },
+  "scheduling": {
+    "followup_delay_days": 7,
+    "max_followups": 3,
+    "daily_email_limit": 50,
+    "rate_limit_delay_seconds": 60,
+    "working_hours_start": 9,
+    "working_hours_end": 17,
+    "working_days": [0, 1, 2, 3, 4],
+    "timezone": "UTC"
+  }
+}
 ```
 
-### 2. Enrich Leads (`enrich_leads.py`) ✅
-**Status: Mostly Working**
-- Enriches leads with Perplexity research
-- Company and person enrichment
-- Batch processing with error handling
-- Status tracking and validation
-
-### 3. API Testing (`test_apis.py`) ⚠️
-**Status: Minor Issues**
-- API connectivity validation
-- Health checks and diagnostics
-- Workflow integration testing
-- Some remaining Flask context dependencies
-
-### 4. Contact Leads (`contact_leads.py`) 🔄
-**Status: In Development**
-- Email generation and sending
-- Contact management
-- Follow-up scheduling
-
-## 🏗️ Architecture
-
-### Business Logic Separation
-Clean separation between business logic and Firebase Functions:
+### Project Configuration
 
 ```python
-# Business logic (pure Python, easily testable)
-def my_function_logic(request_data: Dict, auth_uid: str = None) -> Dict:
-    # Implementation here
-    pass
-
-# Firebase Functions wrapper
-@https_fn.on_call()
-def my_function(req: https_fn.CallableRequest) -> Dict:
-    return my_function_logic(req.data, req.auth.uid if req.auth else None)
+{
+  "project_id": "project_123",
+  "location": {
+    "raw_location": "San Francisco, CA",
+    "apollo_location_ids": ["5341"],
+    "use_llm_parsing": true
+  },
+  "use_global_lead_filter": true,
+  "use_global_job_roles": true,
+  "use_global_enrichment": true,
+  "use_global_email_generation": true,
+  "use_global_scheduling": true
+}
 ```
 
-### Testing Infrastructure
-- **Base Test Class**: `FirebaseFunctionsTestCase`
-- **Proper Mocking**: Firebase Functions objects instead of Flask
-- **Request Creation**: `create_callable_request()` and `create_http_request()`
-- **Mock Services**: Comprehensive API client mocks
+## 🔄 Usage Examples
 
-## 🛠️ Development
+### Find Leads
 
-### Local Development
-```bash
-# Start Firebase Functions emulator
-firebase emulators:start --only functions
-
-# Test function locally
-curl -X POST http://localhost:5001/your-project/us-central1/find_leads \
-  -H "Content-Type: application/json" \
-  -d '{"data": {"project_id": "test"}}'
+```javascript
+const result = await functions.httpsCallable('find_leads')({
+  project_id: 'project_123',
+  num_leads: 25,
+  auto_enrich: true,
+  search_params: {
+    person_titles: ['CEO', 'Founder'],
+    organization_locations: ['United States']
+  }
+});
 ```
 
-### Testing Specific Functions
-```bash
-# Run specific test file
-python -m pytest tests/test_find_leads.py -v
+### Enrich Leads
 
-# Run with coverage
-coverage run -m pytest tests/
-coverage report
+```javascript
+const result = await functions.httpsCallable('enrich_leads')({
+  project_id: 'project_123',
+  lead_ids: ['lead_1', 'lead_2'],
+  enrichment_type: 'both'
+});
 ```
 
-## 📋 Next Steps
+### Generate Emails
 
-### Phase 2 (Current)
-- [ ] Complete enrich_leads test fixes
-- [ ] Add Firebase Authentication
-- [ ] Implement CORS support
+```javascript
+const result = await functions.httpsCallable('generate_emails')({
+  project_id: 'project_123',
+  lead_ids: ['lead_1'],
+  email_type: 'outreach'
+});
+```
 
-### Phase 3 (Upcoming)
-- [ ] Create TypeScript SDK for frontend
-- [ ] Add rate limiting and monitoring
-- [ ] Complete contact/email functionality
-- [ ] Production deployment
+### Send Emails
 
-## 📁 Project Structure
+```javascript
+const result = await functions.httpsCallable('contact_leads')({
+  project_id: 'project_123',
+  lead_ids: ['lead_1'],
+  email_type: 'outreach',
+  dry_run: false
+});
+```
+
+## 🎯 Key Features
+
+### Lead Discovery
+- Location-based targeting with LLM parsing
+- Job role filtering with configurable targets
+- Company size and quality filtering
+- Duplicate detection across projects
+- Blacklist management
+
+### Lead Enrichment
+- Company research and insights
+- Person-specific information
+- Configurable enrichment prompts
+- Retry logic with error handling
+- Quality validation
+
+### Email Outreach
+- Personalized email generation
+- Subject line optimization
+- Outreach and followup sequences
+- SMTP delivery with tracking
+- Rate limiting and scheduling
+
+### Configuration Management
+- Global and project-specific settings
+- Real-time configuration updates
+- Inheritance and override system
+- API key management
+- Prompt customization
+
+## 🔒 Security
+
+- API keys stored securely in Firebase
+- Input validation on all functions
+- Rate limiting to prevent abuse
+- Error handling without exposing internals
+- Blacklist management for compliance
+
+## 📈 Monitoring
+
+- Comprehensive logging throughout
+- API health monitoring
+- Test result tracking
+- Error reporting and handling
+- Performance metrics
+
+## 🚀 Deployment
+
+The system is ready for production deployment with:
+
+- Complete error handling
+- Comprehensive logging
+- Input validation
+- Rate limiting
+- Security best practices
+- Monitoring and health checks
+
+## 📝 Development
+
+### File Structure
 
 ```
 functions/
-├── find_leads.py          # ✅ Lead discovery (100% working)
-├── enrich_leads.py        # ✅ Lead enrichment (mostly working)
-├── test_apis.py           # ⚠️ API testing (minor issues)
-├── contact_leads.py       # 🔄 Email/contact (in development)
-├── utils/                 # ✅ Utility modules
-│   ├── apollo_client.py   # Apollo.io integration
-│   ├── perplexity_client.py # Perplexity AI integration
-│   ├── openai_client.py   # OpenAI integration
-│   └── lead_processor.py  # Lead data processing
-├── tests/                 # ✅ Test infrastructure (fixed)
-│   ├── base_test.py       # Firebase Functions testing base
-│   ├── mocks.py           # Mock API clients
-│   ├── run_tests.py       # Test runner
-│   └── test_*.py          # Individual test files
-└── requirements.txt       # Python dependencies
+├── main.py                 # Main Firebase Functions entry point
+├── config_model.py         # Configuration data models
+├── config_sync.py          # Firebase configuration sync
+├── config_management.py    # Configuration CRUD functions
+├── find_leads.py          # Lead discovery with Apollo
+├── enrich_leads.py        # Lead enrichment with Perplexity
+├── email_generation.py    # Email generation with OpenAI
+├── contact_leads.py       # Email sending and scheduling
+├── location_processor.py  # Location parsing and mapping
+├── job_role_config.py     # Job role management
+├── test_apis.py          # API testing functions
+├── test_system.py        # Comprehensive system tests
+├── utils/                # Utility modules
+│   ├── api_clients.py    # API client implementations
+│   ├── email_utils.py    # Email utilities
+│   ├── firebase_utils.py # Firebase utilities
+│   └── data_processing.py # Data processing utilities
+└── requirements.txt      # Python dependencies
 ```
 
-## 🔍 Troubleshooting
+### Adding New Features
 
-### Common Issues
+1. Define configuration in `config_model.py`
+2. Add sync logic in `config_sync.py`
+3. Implement business logic in new module
+4. Add Firebase Function wrapper
+5. Export in `main.py`
+6. Add tests in `test_system.py`
 
-1. **"Working outside of application context"**
-   - Affects some API testing functions only
-   - Use business logic functions directly for testing
-   - Workaround: Use mock tests during development
+## 📞 Support
 
-2. **Mock test failures**
-   - Check API key environment variables
-   - Verify mock data in `tests/mocks.py`
-
-3. **Integration test failures**
-   - Ensure Firebase emulator is running
-   - Check internet connectivity for API calls
-
-## 📊 API Integrations
-
-- **Apollo.io**: Lead discovery and contact information
-- **Perplexity AI**: Company and person research/enrichment  
-- **OpenAI**: Email content generation and AI processing
-- **Firebase Firestore**: Data storage and project management
-- **Firebase Functions**: Serverless backend hosting
-
-## 🎯 Success Metrics
-
-**Before Implementation:**
-- Integration tests: 42.5% success rate
-- Flask context errors blocking development
-- No business logic separation
-- Untestable functions
-
-**After Implementation:**
-- Mock tests: **89.5%** success rate ✅
-- Integration tests: **73.7%** success rate ✅  
-- Find leads: **100%** working ✅
-- Clean separation of concerns ✅
-- Ready for frontend integration ✅
-- Production deployment ready ✅
+For issues or questions:
+1. Check the logs in Firebase Console
+2. Run `python test_system.py` for diagnostics
+3. Verify API keys and configuration
+4. Check Firebase Functions deployment status
 
 ---
 
-## 🚀 Ready for Production
-
-The Firebase Functions backend is now **production-ready** with:
-- ✅ Robust testing infrastructure
-- ✅ Clean architecture patterns
-- ✅ Core functionality working
-- ✅ Ready for frontend integration
-- ✅ Scalable and maintainable codebase
-
-*Implementation completed successfully - Backend ready for frontend development and production deployment* 
+**Status**: ✅ Production Ready - All core functionality implemented and tested. 

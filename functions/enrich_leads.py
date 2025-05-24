@@ -7,7 +7,10 @@ Can be used to re-enrich leads or enrich leads that were added without enrichmen
 
 import logging
 from typing import Dict, List, Optional, Any
-from firebase_functions import https_fn
+from firebase_functions import https_fn, options
+
+# Configure European region
+EUROPEAN_REGION = options.SupportedRegion.EUROPE_WEST1
 from firebase_admin import firestore
 
 from utils import (
@@ -17,6 +20,7 @@ from utils import (
     get_api_keys,
     get_project_settings
 )
+from config_sync import get_config_sync
 
 
 def enrich_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Dict[str, Any]:
@@ -55,6 +59,22 @@ def enrich_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Di
             raise ValueError(f"Project {project_id} not found")
         
         project_data = project_doc.to_dict()
+        
+        # Load project configuration
+        config_sync = get_config_sync()
+        project_config = config_sync.load_project_config_from_firebase(project_id)
+        global_config = config_sync.load_global_config_from_firebase()
+        effective_config = project_config.get_effective_config(global_config)
+        
+        # Check if enrichment is enabled
+        if not effective_config.enrichment.enabled:
+            return {
+                'success': False,
+                'message': 'Lead enrichment is disabled for this project',
+                'leads_processed': 0,
+                'leads_enriched': 0,
+                'leads_failed': 0
+            }
         
         # Initialize API clients
         api_keys = get_api_keys()
@@ -115,39 +135,75 @@ def enrich_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Di
         batch = db.batch()
         
         for lead in leads_to_enrich:
+            enrichment_success = False
+            enrichment_attempts = 0
+            enrichment_error = None
+            
+            while enrichment_attempts < effective_config.enrichment.max_retries and not enrichment_success:
+                enrichment_attempts += 1
+                
+                try:
+                    enrichment_data = {}
+                    
+                    # Prepare enrichment prompt using configured template
+                    company_name = lead.get('company', '')
+                    person_name = lead.get('name', '')
+                    person_title = lead.get('title', '')
+                    
+                    if company_name and (enrichment_type in ['company', 'both']):
+                        # Format the enrichment prompt
+                        formatted_prompt = effective_config.enrichment.prompt_template.format(
+                            company=company_name,
+                            name=person_name,
+                            title=person_title
+                        )
+                        
+                        # Add project context
+                        if project_data.get('projectDetails'):
+                            formatted_prompt += f"\n\nProject Context: {project_data['projectDetails']}"
+                        
+                        # Call Perplexity with configured timeout
+                        enrichment_response = perplexity_client.enrich_lead_data(
+                            company_name=company_name,
+                            person_name=person_name if enrichment_type in ['person', 'both'] else None,
+                            additional_context=formatted_prompt,
+                            timeout=effective_config.enrichment.timeout_seconds
+                        )
+                        
+                        if enrichment_response and enrichment_response.get('choices'):
+                            content = enrichment_response['choices'][0]['message']['content']
+                            
+                            if validate_enrichment_data({'content': content}):
+                                enrichment_data['enrichment_content'] = content
+                                enrichment_data['enrichment_timestamp'] = firestore.SERVER_TIMESTAMP
+                                enrichment_data['enrichment_source'] = 'perplexity'
+                                enrichment_data['enrichment_prompt_used'] = formatted_prompt
+                                enrichment_success = True
+                            else:
+                                logging.warning(f"Enrichment data failed validation for lead: {lead.get('email', 'Unknown')}")
+                                enrichment_error = "Enrichment data failed quality validation"
+                        else:
+                            enrichment_error = "No response from Perplexity API"
+                    else:
+                        enrichment_error = "Missing required data for enrichment (company name)"
+                        break  # Don't retry if we don't have the required data
+                    
+                except Exception as e:
+                    enrichment_error = str(e)
+                    logging.warning(f"Enrichment attempt {enrichment_attempts} failed for lead {lead.get('email', 'Unknown')}: {e}")
+                    
+                    if enrichment_attempts < effective_config.enrichment.max_retries:
+                        logging.info(f"Retrying enrichment for lead {lead.get('email', 'Unknown')} (attempt {enrichment_attempts + 1})")
+            
+            # Update lead based on enrichment result
             try:
-                enrichment_data = {}
-                
-                # Company enrichment
-                if enrichment_type in ['company', 'both'] and lead.get('company'):
-                    company_research = perplexity_client.enrich_lead_data(
-                        company_name=lead['company'],
-                        additional_context=f"Research for lead generation project: {project_data.get('projectDetails', '')}"
-                    )
-                    
-                    if company_research and company_research.get('choices'):
-                        enrichment_data['company_research'] = company_research['choices'][0]['message']['content']
-                        enrichment_data['company_research_timestamp'] = firestore.SERVER_TIMESTAMP
-                
-                # Person enrichment
-                if enrichment_type in ['person', 'both'] and lead.get('name') and lead.get('company'):
-                    person_research = perplexity_client.enrich_lead_data(
-                        company_name=lead['company'],
-                        person_name=lead['name'],
-                        additional_context=f"Research about this person for outreach: {project_data.get('projectDetails', '')}"
-                    )
-                    
-                    if person_research and person_research.get('choices'):
-                        enrichment_data['person_research'] = person_research['choices'][0]['message']['content']
-                        enrichment_data['person_research_timestamp'] = firestore.SERVER_TIMESTAMP
-                
-                # Update lead with enrichment data
-                if enrichment_data:
+                if enrichment_success and enrichment_data:
                     update_data = {
                         **enrichment_data,
                         'enrichmentStatus': 'enriched',
                         'enrichmentType': enrichment_type,
-                        'lastEnrichmentDate': firestore.SERVER_TIMESTAMP
+                        'lastEnrichmentDate': firestore.SERVER_TIMESTAMP,
+                        'enrichmentAttempts': enrichment_attempts
                     }
                     
                     # Add to batch update
@@ -155,26 +211,24 @@ def enrich_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Di
                     batch.update(lead_ref, update_data)
                     enriched_count += 1
                     
-                    logging.info(f"Enriched lead: {lead.get('email', lead.get('name', 'Unknown'))}")
+                    logging.info(f"Successfully enriched lead: {lead.get('email', lead.get('name', 'Unknown'))}")
                 else:
-                    logging.warning(f"No enrichment data generated for lead: {lead.get('email', lead.get('name', 'Unknown'))}")
-                    failed_count += 1
-                    
-            except Exception as e:
-                logging.error(f"Failed to enrich lead {lead.get('email', lead.get('name', 'Unknown'))}: {e}")
-                failed_count += 1
-                
-                # Mark lead as failed enrichment
-                try:
+                    # Mark as failed
                     update_data = {
                         'enrichmentStatus': 'failed',
-                        'enrichmentError': str(e),
-                        'lastEnrichmentAttempt': firestore.SERVER_TIMESTAMP
+                        'enrichmentError': enrichment_error or 'Unknown error',
+                        'lastEnrichmentAttempt': firestore.SERVER_TIMESTAMP,
+                        'enrichmentAttempts': enrichment_attempts
                     }
                     lead_ref = db.collection('leads').document(lead['id'])
                     batch.update(lead_ref, update_data)
-                except Exception as batch_error:
-                    logging.error(f"Failed to update lead with error status: {batch_error}")
+                    failed_count += 1
+                    
+                    logging.warning(f"Failed to enrich lead after {enrichment_attempts} attempts: {lead.get('email', lead.get('name', 'Unknown'))}")
+                    
+            except Exception as batch_error:
+                logging.error(f"Failed to update lead status: {batch_error}")
+                failed_count += 1
         
         # Commit batch updates
         if enriched_count > 0 or failed_count > 0:
@@ -216,7 +270,7 @@ def enrich_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Di
         }
 
 
-@https_fn.on_call()
+@https_fn.on_call(region=EUROPEAN_REGION)
 def enrich_leads(req: https_fn.CallableRequest) -> Dict[str, Any]:
     """
     Firebase Functions wrapper for enriching leads
@@ -336,7 +390,7 @@ def get_enrichment_status_logic(request_data: Dict[str, Any], auth_uid: str = No
         }
 
 
-@https_fn.on_call()
+@https_fn.on_call(region=EUROPEAN_REGION)
 def get_enrichment_status(req: https_fn.CallableRequest) -> Dict[str, Any]:
     """
     Firebase Functions wrapper for getting enrichment status
@@ -423,10 +477,14 @@ def validate_enrichment_data(enrichment_data: Dict[str, Any]) -> bool:
         True if data meets quality standards, False otherwise
     """
     # Check for minimum content length
+    content = enrichment_data.get('content', '')
     company_research = enrichment_data.get('company_research', '')
     person_research = enrichment_data.get('person_research', '')
     
-    if len(company_research) < 100 and len(person_research) < 100:
+    # Use the new unified content format or fall back to legacy format
+    text_to_validate = content or (company_research + ' ' + person_research)
+    
+    if len(text_to_validate) < 100:
         return False
     
     # Check for generic/error responses
@@ -435,11 +493,26 @@ def validate_enrichment_data(enrichment_data: Dict[str, Any]) -> bool:
         'i cannot find',
         'no information available',
         'unable to provide',
-        'insufficient data'
+        'insufficient data',
+        'i apologize',
+        'i\'m sorry',
+        'i don\'t know',
+        'error occurred',
+        'failed to retrieve'
     ]
     
-    combined_text = (company_research + ' ' + person_research).lower()
-    if any(phrase in combined_text for phrase in generic_phrases):
+    text_lower = text_to_validate.lower()
+    if any(phrase in text_lower for phrase in generic_phrases):
+        return False
+    
+    # Check for very repetitive content (possible API issue)
+    words = text_to_validate.split()
+    if len(set(words)) < len(words) * 0.3:  # Less than 30% unique words
+        return False
+    
+    # Check for minimum number of sentences (rough validation)
+    sentences = text_to_validate.split('.')
+    if len(sentences) < 3:
         return False
     
     return True 

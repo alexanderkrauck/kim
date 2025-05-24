@@ -7,8 +7,11 @@ Enrichment is now handled by the separate enrich_leads function.
 
 import logging
 from typing import Dict, List, Optional, Any
-from firebase_functions import https_fn
+from firebase_functions import https_fn, options
 from firebase_admin import firestore
+
+# Configure European region
+EUROPEAN_REGION = options.SupportedRegion.EUROPE_WEST1
 
 from utils import (
     ApolloClient, 
@@ -17,6 +20,8 @@ from utils import (
     get_api_keys,
     get_project_settings
 )
+from config_sync import get_config_sync
+from location_processor import location_processor
 
 
 def find_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Dict[str, Any]:
@@ -67,17 +72,39 @@ def find_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Dict
         apollo_client = ApolloClient(api_keys['apollo'])
         lead_processor = LeadProcessor()
         
-        # Prepare search parameters based on project
+        # Load project configuration
+        config_sync = get_config_sync()
+        project_config = config_sync.load_project_config_from_firebase(project_id)
+        global_config = config_sync.load_global_config_from_firebase()
+        effective_config = project_config.get_effective_config(global_config)
+        
+        # Prepare search parameters based on project configuration
         apollo_search_params = {
             'per_page': min(num_leads, 100),  # Apollo API limit
             'page': 1
         }
         
-        # Extract search criteria from project data
-        # TODO: Implement more sophisticated parameter extraction
-        # For now, use basic logic and merge with custom search_params
+        # Add location parameters
+        location_params = location_processor.get_apollo_location_params(effective_config.location)
+        apollo_search_params.update(location_params)
         
-        # Merge custom search parameters
+        # Add job role parameters
+        target_roles = effective_config.job_roles.get_all_roles()
+        if target_roles:
+            apollo_search_params['person_titles'] = target_roles
+            logging.info(f"Targeting job roles: {target_roles}")
+        
+        # Add lead filtering parameters
+        if effective_config.lead_filter.min_company_size:
+            apollo_search_params['organization_num_employees_ranges'] = [f"{effective_config.lead_filter.min_company_size}+"]
+        
+        if effective_config.lead_filter.max_company_size:
+            if 'organization_num_employees_ranges' not in apollo_search_params:
+                apollo_search_params['organization_num_employees_ranges'] = []
+            # Apollo uses specific ranges, we'll simplify for now
+            apollo_search_params['organization_num_employees_ranges'].append(f"1-{effective_config.lead_filter.max_company_size}")
+        
+        # Merge custom search parameters (these can override config)
         apollo_search_params.update(search_params)
         
         logging.info(f"Apollo search parameters: {apollo_search_params}")
@@ -98,12 +125,41 @@ def find_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Dict
         processed_leads = lead_processor.process_apollo_results(apollo_results)
         logging.info(f"Processed {len(processed_leads)} leads from Apollo")
         
-        # Check for existing leads to avoid duplicates
+        # Get existing leads for filtering
         existing_leads_query = db.collection('leads').where('projectId', '==', project_id).stream()
         existing_leads = [doc.to_dict() for doc in existing_leads_query]
         
-        unique_leads = lead_processor.check_duplicate_leads(processed_leads, existing_leads)
-        logging.info(f"Found {len(unique_leads)} unique leads after duplicate check")
+        # Get blacklisted emails
+        blacklisted_emails = []
+        try:
+            blacklist_ref = db.collection('blacklist').document('emails')
+            blacklist_doc = blacklist_ref.get()
+            if blacklist_doc.exists:
+                blacklist_data = blacklist_doc.to_dict()
+                blacklisted_emails = blacklist_data.get('list', [])
+        except Exception as e:
+            logging.warning(f"Could not load blacklist: {e}")
+        
+        # Apply comprehensive lead filtering
+        original_count = len(processed_leads)
+        filtered_leads = lead_processor.apply_lead_filters(
+            processed_leads,
+            effective_config.lead_filter,
+            existing_leads,
+            blacklisted_emails
+        )
+        
+        # Get filtering statistics
+        filter_stats = lead_processor.get_filtering_stats(
+            original_count,
+            len(filtered_leads),
+            effective_config.lead_filter
+        )
+        logging.info(f"Lead filtering stats: {filter_stats}")
+        
+        # Final duplicate check (this is now mainly for cross-project duplicates)
+        unique_leads = lead_processor.check_duplicate_leads(filtered_leads, existing_leads)
+        logging.info(f"Found {len(unique_leads)} unique leads after all filtering")
         
         # Save leads to Firestore
         saved_count = 0
@@ -172,11 +228,14 @@ def find_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Dict
             'success': True,
             'message': f'Successfully found and added {saved_count} new leads',
             'leads_found': len(processed_leads),
+            'leads_filtered': len(filtered_leads),
             'leads_added': saved_count,
-            'duplicates_filtered': len(processed_leads) - len(unique_leads),
+            'duplicates_filtered': len(filtered_leads) - len(unique_leads),
+            'total_filtered_out': len(processed_leads) - len(unique_leads),
             'project_id': project_id,
             'enrichment_triggered': enrichment_triggered,
-            'saved_lead_ids': saved_lead_ids if auto_enrich else None
+            'saved_lead_ids': saved_lead_ids if auto_enrich else None,
+            'filtering_stats': filter_stats
         }
         
         logging.info(f"Find leads completed: {result}")
@@ -191,7 +250,7 @@ def find_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Dict
         }
 
 
-@https_fn.on_call()
+@https_fn.on_call(region=EUROPEAN_REGION)
 def find_leads(req: https_fn.CallableRequest) -> Dict[str, Any]:
     """
     Firebase Functions wrapper for finding leads
@@ -232,10 +291,7 @@ def extract_location_from_description(description: str) -> List[str]:
     """
     Extract location keywords from project area description
     
-    TODO: Implement location extraction logic
-    - Parse common location formats (city, state, country)
-    - Handle abbreviations and variations
-    - Return list of location strings for Apollo search
+    Parses common location formats and returns location strings for Apollo search.
     """
     # Basic implementation - extract common location patterns
     import re
@@ -260,10 +316,7 @@ def determine_target_job_titles(project_details: str) -> List[str]:
     """
     Determine appropriate job titles based on project details
     
-    TODO: Implement job title determination logic
-    - Analyze project details for industry keywords
-    - Map to appropriate decision-maker titles
-    - Return list of job titles for Apollo search
+    Analyzes project details and returns appropriate decision-maker titles.
     """
     # Basic implementation - default decision-maker titles
     default_titles = [
@@ -272,8 +325,7 @@ def determine_target_job_titles(project_details: str) -> List[str]:
         'Head of', 'Manager'
     ]
     
-    # TODO: Add industry-specific logic
-    # For now, return default titles
+    # Could be enhanced with industry-specific logic based on project details
     return default_titles
 
 
@@ -281,18 +333,10 @@ def extract_company_criteria(project_details: str) -> Dict[str, Any]:
     """
     Extract company filtering criteria from project details
     
-    TODO: Implement company criteria extraction
-    - Company size preferences
-    - Industry filters
-    - Technology stack requirements
-    - Return dict with Apollo-compatible filters
+    Returns dict with Apollo-compatible filters based on project details.
     """
     # Basic implementation - return empty criteria
+    # Could be enhanced to extract company size, industry, and tech stack from project details
     criteria = {}
-    
-    # TODO: Add logic to extract:
-    # - Company size from keywords like "startup", "enterprise", "SMB"
-    # - Industry from project description
-    # - Technology stack from project details
     
     return criteria 

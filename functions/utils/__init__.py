@@ -3,8 +3,8 @@ Utility modules for Firebase Functions
 """
 
 from .api_clients import ApolloClient, PerplexityClient, OpenAIClient
-from .firebase_utils import get_firestore_client, get_api_keys, get_project_settings
-from .email_utils import EmailService
+from .firebase_utils import get_firestore_client, get_api_keys, get_project_settings, get_project_prompts
+from .email_utils import EmailService, format_email_content
 from .data_processing import LeadProcessor, DataValidator
 from .api_testing import (
     test_apollo_api, 
@@ -23,7 +23,9 @@ __all__ = [
     'get_firestore_client',
     'get_api_keys',
     'get_project_settings',
+    'get_project_prompts',
     'EmailService',
+    'format_email_content',
     'LeadProcessor',
     'DataValidator',
     'test_apollo_api',

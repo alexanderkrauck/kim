@@ -5,8 +5,7 @@ import {
   UserGroupIcon, 
   ArrowRightOnRectangleIcon,
   NoSymbolIcon,
-  FolderIcon,
-  ExclamationTriangleIcon
+  FolderIcon
 } from '@heroicons/react/24/outline';
 
 interface LayoutProps {
@@ -22,7 +21,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => 
     { name: 'Projects', id: 'projects', icon: FolderIcon },
     { name: 'Leads', id: 'leads', icon: UserGroupIcon },
     { name: 'Global Blacklist', id: 'blacklist', icon: NoSymbolIcon },
-    { name: 'Settings', id: 'apikeys', icon: Cog6ToothIcon },
+    { name: 'Configuration', id: 'configuration', icon: Cog6ToothIcon },
   ];
 
   const handleLogout = async () => {
@@ -78,9 +77,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => 
                 >
                   <Icon className="h-5 w-5 mr-2" />
                   {item.name}
-                  {item.id === 'apikeys' && (
-                    <ExclamationTriangleIcon className="h-4 w-4 ml-2 text-amber-500" />
-                  )}
                 </button>
               );
             })}

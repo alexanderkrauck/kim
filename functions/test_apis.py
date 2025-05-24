@@ -8,8 +8,11 @@ Can be used to validate API keys and troubleshoot issues in production.
 import logging
 from datetime import datetime
 from typing import Dict, Any
-from firebase_functions import https_fn
+from firebase_functions import https_fn, options
 from firebase_admin import firestore
+
+# Configure European region
+EUROPEAN_REGION = options.SupportedRegion.EUROPE_WEST1
 
 from utils import (
     get_api_keys,
@@ -20,7 +23,7 @@ from utils import (
 )
 
 
-@https_fn.on_call()
+@https_fn.on_call(region=EUROPEAN_REGION)
 def test_apis(req: https_fn.CallableRequest) -> Dict[str, Any]:
     """
     Test API connectivity and health
@@ -135,7 +138,7 @@ def test_apis(req: https_fn.CallableRequest) -> Dict[str, Any]:
         )
 
 
-@https_fn.on_call()
+@https_fn.on_call(region=EUROPEAN_REGION)
 def validate_api_keys(req: https_fn.CallableRequest) -> Dict[str, Any]:
     """
     Validate API key formats without making API calls
@@ -202,7 +205,7 @@ def validate_api_keys(req: https_fn.CallableRequest) -> Dict[str, Any]:
         )
 
 
-@https_fn.on_call()
+@https_fn.on_call(region=EUROPEAN_REGION)
 def get_api_status(req: https_fn.CallableRequest) -> Dict[str, Any]:
     """
     Get current API status and recent test results
