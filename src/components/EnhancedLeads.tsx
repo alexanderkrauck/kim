@@ -12,7 +12,8 @@ import {
   EyeIcon,
   ChevronUpIcon,
   ChevronDownIcon,
-  CheckCircleIcon
+  CheckCircleIcon,
+  MagnifyingGlassIcon
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
@@ -30,6 +31,7 @@ const EnhancedLeads: React.FC<EnhancedLeadsProps> = ({ selectedProject }) => {
   const [sortField, setSortField] = useState<keyof Lead>('createdAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [retryCount, setRetryCount] = useState(0);
+  const [searchingLeads, setSearchingLeads] = useState(false);
   const { currentUser } = useAuth();
   const [newLead, setNewLead] = useState<LeadImport>({
     email: '',
@@ -300,6 +302,66 @@ const EnhancedLeads: React.FC<EnhancedLeadsProps> = ({ selectedProject }) => {
     }
   };
 
+  const findLeads = async () => {
+    if (!selectedProject) {
+      toast.error('Please select a project first');
+      return;
+    }
+
+    setSearchingLeads(true);
+    try {
+      toast.loading('Searching for new leads...', { id: 'lead-search' });
+      
+      const findLeadsFunction = httpsCallable(functions, 'find_leads');
+      const result = await findLeadsFunction({
+        project_id: selectedProject.id,
+        num_leads: 25, // Default number of leads to find
+        auto_enrich: true, // Automatically enrich found leads
+        save_without_enrichment: true // Save leads even if enrichment fails
+      });
+
+      const data = result.data as any;
+      
+      if (data.success) {
+        toast.success(
+          `Found ${data.leads_added} new leads! ${data.enrichment_triggered ? 'Enrichment started.' : ''}`,
+          { id: 'lead-search' }
+        );
+        
+        // Show detailed results
+        if (data.leads_found > data.leads_added) {
+          toast(
+            `${data.leads_found - data.leads_added} leads were filtered out (duplicates or blacklisted)`,
+            { 
+              duration: 5000,
+              icon: 'ℹ️'
+            }
+          );
+        }
+        
+        // Reload leads to show the new ones
+        await loadLeads();
+      } else {
+        throw new Error(data.error || 'Unknown error occurred');
+      }
+    } catch (error: any) {
+      console.error('Error finding leads:', error);
+      
+      let errorMessage = 'Failed to find leads';
+      if (error.message?.includes('Apollo API key')) {
+        errorMessage = 'Apollo API key not configured. Please check your configuration.';
+      } else if (error.message?.includes('permission')) {
+        errorMessage = 'Permission denied. Please check your authentication.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage, { id: 'lead-search' });
+    } finally {
+      setSearchingLeads(false);
+    }
+  };
+
   const exportToCSV = () => {
     if (leads.length === 0) {
       toast.error('No leads to export');
@@ -460,6 +522,23 @@ const EnhancedLeads: React.FC<EnhancedLeadsProps> = ({ selectedProject }) => {
             Export CSV
           </button>
           <button
+            onClick={findLeads}
+            disabled={searchingLeads}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
+          >
+            {searchingLeads ? (
+              <>
+                <div className="animate-spin -ml-1 mr-3 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                Searching...
+              </>
+            ) : (
+              <>
+                <MagnifyingGlassIcon className="h-4 w-4 mr-2" />
+                Find Leads
+              </>
+            )}
+          </button>
+          <button
             onClick={() => setShowAddForm(true)}
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700"
           >
@@ -586,8 +665,34 @@ const EnhancedLeads: React.FC<EnhancedLeadsProps> = ({ selectedProject }) => {
               <ExclamationTriangleIcon className="mx-auto h-12 w-12 text-gray-400" />
               <h3 className="mt-2 text-sm font-medium text-gray-900">No leads found</h3>
               <p className="mt-1 text-sm text-gray-500">
-                Get started by adding your first lead to this project.
+                Get started by finding leads automatically or adding them manually.
               </p>
+              <div className="mt-6 flex justify-center space-x-3">
+                <button
+                  onClick={findLeads}
+                  disabled={searchingLeads}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
+                >
+                  {searchingLeads ? (
+                    <>
+                      <div className="animate-spin -ml-1 mr-3 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                      Searching...
+                    </>
+                  ) : (
+                    <>
+                      <MagnifyingGlassIcon className="h-4 w-4 mr-2" />
+                      Find Leads
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => setShowAddForm(true)}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  <PlusIcon className="h-4 w-4 mr-2" />
+                  Add Manually
+                </button>
+              </div>
               {retryCount > 0 && (
                 <div className="mt-4">
                   <button
