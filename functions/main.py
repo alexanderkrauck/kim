@@ -10,6 +10,10 @@ import logging
 # Configure European region
 EUROPEAN_REGION = options.SupportedRegion.EUROPE_WEST1
 
+# Configure logging for Firebase Functions
+from utils.logging_config import get_logger
+logger = get_logger(__file__)
+
 # Import new functions
 from find_leads import find_leads
 from contact_leads import contact_leads
@@ -102,7 +106,7 @@ def trigger_followup(req: https_fn.CallableRequest) -> dict:
         
         # Here you would typically integrate with your email service
         # For now, we'll just log the action
-        logging.info(f"Follow-up triggered for lead {lead_id} ({lead_data.get('email')})")
+        logger.info(f"Follow-up triggered for lead {lead_id} ({lead_data.get('email')})")
         
         return {
             'success': True,
@@ -111,7 +115,7 @@ def trigger_followup(req: https_fn.CallableRequest) -> dict:
         }
         
     except Exception as e:
-        logging.error(f"Error triggering follow-up: {str(e)}")
+        logger.error(f"Error triggering follow-up: {str(e)}")
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.INTERNAL,
             message=str(e)
@@ -181,7 +185,7 @@ def process_all_followups(req: https_fn.CallableRequest) -> dict:
             })
             
             processed_count += 1
-            logging.info(f"Follow-up processed for lead {lead_id} ({email})")
+            logger.info(f"Follow-up processed for lead {lead_id} ({email})")
         
         return {
             'success': True,
@@ -190,7 +194,7 @@ def process_all_followups(req: https_fn.CallableRequest) -> dict:
         }
         
     except Exception as e:
-        logging.error(f"Error processing follow-ups: {str(e)}")
+        logger.error(f"Error processing follow-ups: {str(e)}")
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.INTERNAL,
             message=str(e)
@@ -205,13 +209,13 @@ def on_lead_created(event: firestore_fn.Event[firestore_fn.DocumentSnapshot]) ->
         lead_data = event.data.to_dict()
         lead_id = event.params['leadId']
         
-        logging.info(f"New lead created: {lead_id} ({lead_data.get('email')})")
+        logger.info(f"New lead created: {lead_id} ({lead_data.get('email')})")
         
         # Here you could trigger initial outreach email
         # For now, we'll just log the event
         
     except Exception as e:
-        logging.error(f"Error processing new lead: {str(e)}")
+        logger.error(f"Error processing new lead: {str(e)}")
 
 @https_fn.on_request(region=EUROPEAN_REGION)
 def health_check(req: https_fn.Request) -> https_fn.Response:

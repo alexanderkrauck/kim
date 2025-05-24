@@ -12,6 +12,10 @@ from firebase_admin import firestore
 # Configure European region
 EUROPEAN_REGION = options.SupportedRegion.EUROPE_WEST1
 
+# Configure logging for Firebase Functions
+from utils.logging_config import get_logger
+logger = get_logger(__file__)
+
 from utils import (
     OpenAIClient,
     get_firestore_client,
@@ -48,7 +52,7 @@ def generate_emails_logic(request_data: Dict[str, Any], auth_uid: str = None) ->
         if not lead_ids:
             raise ValueError("lead_ids is required")
         
-        logging.info(f"Generating {email_type} emails for project: {project_id}")
+        logger.info(f"Generating {email_type} emails for project: {project_id}")
         
         # Get project details from Firestore
         db = get_firestore_client()
@@ -87,9 +91,9 @@ def generate_emails_logic(request_data: Dict[str, Any], auth_uid: str = None) ->
                 if lead_data.get('projectId') == project_id:
                     leads_to_process.append(lead_data)
                 else:
-                    logging.warning(f"Lead {lead_id} does not belong to project {project_id}")
+                    logger.warning(f"Lead {lead_id} does not belong to project {project_id}")
             else:
-                logging.warning(f"Lead {lead_id} not found")
+                logger.warning(f"Lead {lead_id} not found")
         
         if not leads_to_process:
             return {
@@ -98,7 +102,7 @@ def generate_emails_logic(request_data: Dict[str, Any], auth_uid: str = None) ->
                 'generated_emails': []
             }
         
-        logging.info(f"Found {len(leads_to_process)} leads to process")
+        logger.info(f"Found {len(leads_to_process)} leads to process")
         
         # Generate emails
         generated_emails = []
@@ -146,10 +150,10 @@ def generate_emails_logic(request_data: Dict[str, Any], auth_uid: str = None) ->
                 
                 generated_emails.append(email_record)
                 
-                logging.info(f"Successfully generated {email_type} email for lead: {lead.get('email', lead.get('name', 'Unknown'))}")
+                logger.info(f"Successfully generated {email_type} email for lead: {lead.get('email', lead.get('name', 'Unknown'))}")
                 
             except Exception as e:
-                logging.error(f"Failed to generate email for lead {lead.get('email')}: {e}")
+                logger.error(f"Failed to generate email for lead {lead.get('email')}: {e}")
                 generation_errors.append({
                     'lead_id': lead['id'],
                     'lead_email': lead.get('email'),
@@ -166,11 +170,11 @@ def generate_emails_logic(request_data: Dict[str, Any], auth_uid: str = None) ->
             'email_type': email_type
         }
         
-        logging.info(f"Email generation completed: {result['message']}")
+        logger.info(f"Email generation completed: {result['message']}")
         return result
         
     except Exception as e:
-        logging.error(f"Error in generate_emails: {str(e)}")
+        logger.error(f"Error in generate_emails: {str(e)}")
         return {
             'success': False,
             'error': str(e),
@@ -206,7 +210,7 @@ def generate_emails(req: https_fn.CallableRequest) -> Dict[str, Any]:
         # Re-raise HttpsError as-is
         raise
     except Exception as e:
-        logging.error(f"Error in generate_emails Firebase Function: {str(e)}")
+        logger.error(f"Error in generate_emails Firebase Function: {str(e)}")
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.INTERNAL,
             message=f"Failed to generate emails: {str(e)}"
@@ -277,7 +281,7 @@ def preview_email_logic(request_data: Dict[str, Any], auth_uid: str = None) -> D
         if not project_id or not lead_id:
             raise ValueError("project_id and lead_id are required")
         
-        logging.info(f"Previewing {email_type} email for lead: {lead_id}")
+        logger.info(f"Previewing {email_type} email for lead: {lead_id}")
         
         # Get project and lead data
         db = get_firestore_client()
@@ -352,11 +356,11 @@ def preview_email_logic(request_data: Dict[str, Any], auth_uid: str = None) -> D
             }
         }
         
-        logging.info(f"Email preview generated successfully for lead: {lead_data.get('email')}")
+        logger.info(f"Email preview generated successfully for lead: {lead_data.get('email')}")
         return result
         
     except Exception as e:
-        logging.error(f"Error in preview_email: {str(e)}")
+        logger.error(f"Error in preview_email: {str(e)}")
         return {
             'success': False,
             'error': str(e),
@@ -392,7 +396,7 @@ def preview_email(req: https_fn.CallableRequest) -> Dict[str, Any]:
         # Re-raise HttpsError as-is
         raise
     except Exception as e:
-        logging.error(f"Error in preview_email Firebase Function: {str(e)}")
+        logger.error(f"Error in preview_email Firebase Function: {str(e)}")
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.INTERNAL,
             message=f"Failed to preview email: {str(e)}"

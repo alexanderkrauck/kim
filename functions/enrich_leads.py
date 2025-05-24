@@ -13,6 +13,10 @@ from firebase_functions import https_fn, options
 EUROPEAN_REGION = options.SupportedRegion.EUROPE_WEST1
 from firebase_admin import firestore
 
+# Configure logging for Firebase Functions
+from utils.logging_config import get_logger
+logger = get_logger(__file__)
+
 from utils import (
     PerplexityClient,
     LeadProcessor,
@@ -48,7 +52,7 @@ def enrich_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Di
         if not project_id:
             raise ValueError("project_id is required")
         
-        logging.info(f"Enriching leads for project: {project_id}")
+        logger.info(f"Enriching leads for project: {project_id}")
         
         # Get project details from Firestore
         db = get_firestore_client()
@@ -100,9 +104,9 @@ def enrich_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Di
                     if lead_data.get('projectId') == project_id:
                         leads_to_enrich.append(lead_data)
                     else:
-                        logging.warning(f"Lead {lead_id} does not belong to project {project_id}")
+                        logger.warning(f"Lead {lead_id} does not belong to project {project_id}")
                 else:
-                    logging.warning(f"Lead {lead_id} not found")
+                    logger.warning(f"Lead {lead_id} not found")
         else:
             # Get all leads for the project
             leads_query = db.collection('leads').where('projectId', '==', project_id)
@@ -127,7 +131,7 @@ def enrich_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Di
                 'leads_failed': 0
             }
         
-        logging.info(f"Found {len(leads_to_enrich)} leads to enrich")
+        logger.info(f"Found {len(leads_to_enrich)} leads to enrich")
         
         # Enrich leads
         enriched_count = 0
@@ -180,7 +184,7 @@ def enrich_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Di
                                 enrichment_data['enrichment_prompt_used'] = formatted_prompt
                                 enrichment_success = True
                             else:
-                                logging.warning(f"Enrichment data failed validation for lead: {lead.get('email', 'Unknown')}")
+                                logger.warning(f"Enrichment data failed validation for lead: {lead.get('email', 'Unknown')}")
                                 enrichment_error = "Enrichment data failed quality validation"
                         else:
                             enrichment_error = "No response from Perplexity API"
@@ -190,10 +194,10 @@ def enrich_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Di
                     
                 except Exception as e:
                     enrichment_error = str(e)
-                    logging.warning(f"Enrichment attempt {enrichment_attempts} failed for lead {lead.get('email', 'Unknown')}: {e}")
+                    logger.warning(f"Enrichment attempt {enrichment_attempts} failed for lead {lead.get('email', 'Unknown')}: {e}")
                     
                     if enrichment_attempts < effective_config.enrichment.max_retries:
-                        logging.info(f"Retrying enrichment for lead {lead.get('email', 'Unknown')} (attempt {enrichment_attempts + 1})")
+                        logger.info(f"Retrying enrichment for lead {lead.get('email', 'Unknown')} (attempt {enrichment_attempts + 1})")
             
             # Update lead based on enrichment result
             try:
@@ -211,7 +215,7 @@ def enrich_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Di
                     batch.update(lead_ref, update_data)
                     enriched_count += 1
                     
-                    logging.info(f"Successfully enriched lead: {lead.get('email', lead.get('name', 'Unknown'))}")
+                    logger.info(f"Successfully enriched lead: {lead.get('email', lead.get('name', 'Unknown'))}")
                 else:
                     # Mark as failed
                     update_data = {
@@ -224,16 +228,16 @@ def enrich_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Di
                     batch.update(lead_ref, update_data)
                     failed_count += 1
                     
-                    logging.warning(f"Failed to enrich lead after {enrichment_attempts} attempts: {lead.get('email', lead.get('name', 'Unknown'))}")
+                    logger.warning(f"Failed to enrich lead after {enrichment_attempts} attempts: {lead.get('email', lead.get('name', 'Unknown'))}")
                     
             except Exception as batch_error:
-                logging.error(f"Failed to update lead status: {batch_error}")
+                logger.error(f"Failed to update lead status: {batch_error}")
                 failed_count += 1
         
         # Commit batch updates
         if enriched_count > 0 or failed_count > 0:
             batch.commit()
-            logging.info(f"Committed batch updates for {enriched_count + failed_count} leads")
+            logger.info(f"Committed batch updates for {enriched_count + failed_count} leads")
         
         # Update project enrichment statistics
         try:
@@ -245,7 +249,7 @@ def enrich_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Di
                 }
             })
         except Exception as e:
-            logging.warning(f"Failed to update project enrichment stats: {e}")
+            logger.warning(f"Failed to update project enrichment stats: {e}")
         
         # Return results
         result = {
@@ -258,11 +262,11 @@ def enrich_leads_logic(request_data: Dict[str, Any], auth_uid: str = None) -> Di
             'enrichment_type': enrichment_type
         }
         
-        logging.info(f"Enrich leads completed: {result}")
+        logger.info(f"Enrich leads completed: {result}")
         return result
         
     except Exception as e:
-        logging.error(f"Error in enrich_leads: {str(e)}")
+        logger.error(f"Error in enrich_leads: {str(e)}")
         return {
             'success': False,
             'error': str(e),
@@ -298,7 +302,7 @@ def enrich_leads(req: https_fn.CallableRequest) -> Dict[str, Any]:
         # Re-raise HttpsError as-is
         raise
     except Exception as e:
-        logging.error(f"Error in enrich_leads Firebase Function: {str(e)}")
+        logger.error(f"Error in enrich_leads Firebase Function: {str(e)}")
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.INTERNAL,
             message=f"Failed to enrich leads: {str(e)}"
@@ -382,7 +386,7 @@ def get_enrichment_status_logic(request_data: Dict[str, Any], auth_uid: str = No
             }
         
     except Exception as e:
-        logging.error(f"Error in get_enrichment_status: {str(e)}")
+        logger.error(f"Error in get_enrichment_status: {str(e)}")
         return {
             'success': False,
             'error': str(e),
@@ -418,7 +422,7 @@ def get_enrichment_status(req: https_fn.CallableRequest) -> Dict[str, Any]:
         # Re-raise HttpsError as-is
         raise
     except Exception as e:
-        logging.error(f"Error in get_enrichment_status Firebase Function: {str(e)}")
+        logger.error(f"Error in get_enrichment_status Firebase Function: {str(e)}")
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.INTERNAL,
             message=f"Failed to get enrichment status: {str(e)}"

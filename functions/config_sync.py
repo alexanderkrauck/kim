@@ -9,6 +9,10 @@ from firebase_admin import firestore
 from dataclasses import asdict
 import json
 
+# Configure logging for Firebase Functions
+from utils.logging_config import get_logger
+logger = get_logger(__file__)
+
 from config_model import (
     GlobalConfig, ProjectConfig, SmtpConfig, ApiKeysConfig, 
     LeadFilterConfig, LocationConfig, JobRoleConfig, EnrichmentConfig,
@@ -99,11 +103,11 @@ class ConfigSyncManager:
             }
             self.db.collection('prompts').document('global').set(prompts_dict)
             
-            logging.info("Global configuration synced to Firebase successfully")
+            logger.info("Global configuration synced to Firebase successfully")
             return True
             
         except Exception as e:
-            logging.error(f"Error syncing global config to Firebase: {e}")
+            logger.error(f"Error syncing global config to Firebase: {e}")
             return False
     
     def sync_project_config_to_firebase(self, config: ProjectConfig) -> bool:
@@ -186,11 +190,11 @@ class ConfigSyncManager:
                 }
                 self.db.collection('settings').document(f'project_{project_id}_enrichment').set(enrichment_dict)
             
-            logging.info(f"Project {project_id} configuration synced to Firebase successfully")
+            logger.info(f"Project {project_id} configuration synced to Firebase successfully")
             return True
             
         except Exception as e:
-            logging.error(f"Error syncing project config to Firebase: {e}")
+            logger.error(f"Error syncing project config to Firebase: {e}")
             return False
     
     def load_global_config_from_firebase(self) -> GlobalConfig:
@@ -294,11 +298,11 @@ class ConfigSyncManager:
                 config.email_generation.outreach_prompt = prompts_data.get('outreachPrompt', config.email_generation.outreach_prompt)
                 config.email_generation.followup_prompt = prompts_data.get('followupPrompt', config.email_generation.followup_prompt)
             
-            logging.info("Global configuration loaded from Firebase successfully")
+            logger.info("Global configuration loaded from Firebase successfully")
             return config
             
         except Exception as e:
-            logging.error(f"Error loading global config from Firebase: {e}")
+            logger.error(f"Error loading global config from Firebase: {e}")
             return GlobalConfig()  # Return default config
     
     def load_project_config_from_firebase(self, project_id: str) -> ProjectConfig:
@@ -390,11 +394,11 @@ class ConfigSyncManager:
                         prompt_template=enrich_data.get('promptTemplate', config.enrichment.prompt_template)
                     )
             
-            logging.info(f"Project {project_id} configuration loaded from Firebase successfully")
+            logger.info(f"Project {project_id} configuration loaded from Firebase successfully")
             return config
             
         except Exception as e:
-            logging.error(f"Error loading project config from Firebase: {e}")
+            logger.error(f"Error loading project config from Firebase: {e}")
             return ProjectConfig(project_id=project_id)  # Return default config
 
 

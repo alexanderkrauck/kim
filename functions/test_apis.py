@@ -14,6 +14,10 @@ from firebase_admin import firestore
 # Configure European region
 EUROPEAN_REGION = options.SupportedRegion.EUROPE_WEST1
 
+# Configure logging for Firebase Functions
+from utils.logging_config import get_logger
+logger = get_logger(__file__)
+
 from utils import (
     get_api_keys,
     test_all_apis,
@@ -43,7 +47,7 @@ def test_apis(req: https_fn.CallableRequest) -> Dict[str, Any]:
         minimal = req.data.get('minimal', True)
         save_results = req.data.get('save_results', False)
         
-        logging.info(f"Testing APIs with type: {test_type}, minimal: {minimal}")
+        logger.info(f"Testing APIs with type: {test_type}, minimal: {minimal}")
         
         # Get API keys
         api_keys = get_api_keys()
@@ -120,18 +124,18 @@ def test_apis(req: https_fn.CallableRequest) -> Dict[str, Any]:
                 results['saved_to_firestore'] = True
                 results['document_id'] = test_results_ref.id
             except Exception as e:
-                logging.warning(f"Failed to save test results to Firestore: {e}")
+                logger.warning(f"Failed to save test results to Firestore: {e}")
                 results['saved_to_firestore'] = False
                 results['save_error'] = str(e)
         
         # Add success flag
         results['success'] = True
         
-        logging.info(f"API tests completed successfully: {test_type}")
+        logger.info(f"API tests completed successfully: {test_type}")
         return results
         
     except Exception as e:
-        logging.error(f"Error in test_apis: {str(e)}")
+        logger.error(f"Error in test_apis: {str(e)}")
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.INTERNAL,
             message=f"Failed to test APIs: {str(e)}"
@@ -198,7 +202,7 @@ def validate_api_keys(req: https_fn.CallableRequest) -> Dict[str, Any]:
         }
         
     except Exception as e:
-        logging.error(f"Error in validate_api_keys: {str(e)}")
+        logger.error(f"Error in validate_api_keys: {str(e)}")
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.INTERNAL,
             message=f"Failed to validate API keys: {str(e)}"
@@ -253,14 +257,14 @@ def get_api_status(req: https_fn.CallableRequest) -> Dict[str, Any]:
                 result['recent_tests_count'] = len(recent_tests)
                 
             except Exception as e:
-                logging.warning(f"Failed to get recent test results: {e}")
+                logger.warning(f"Failed to get recent test results: {e}")
                 result['recent_tests'] = []
                 result['recent_tests_error'] = str(e)
         
         return result
         
     except Exception as e:
-        logging.error(f"Error in get_api_status: {str(e)}")
+        logger.error(f"Error in get_api_status: {str(e)}")
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.INTERNAL,
             message=f"Failed to get API status: {str(e)}"

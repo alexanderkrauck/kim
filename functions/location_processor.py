@@ -13,6 +13,10 @@ from openai import OpenAI
 from config_model import LocationConfig
 from utils.firebase_utils import get_api_keys
 
+# Configure logging for Firebase Functions
+from utils.logging_config import get_logger
+logger = get_logger(__file__)
+
 
 class LocationProcessor:
     """Processes location data for Apollo API searches"""
@@ -311,7 +315,7 @@ Return only valid JSON.
             return apollo_ids, parsed_data
             
         except Exception as e:
-            logging.warning(f"LLM location parsing failed: {e}, falling back to simple parsing")
+            logger.warning(f"LLM location parsing failed: {e}, falling back to simple parsing")
             return self._simple_location_parse(raw_location)
     
     def _simple_location_parse(self, raw_location: str) -> Tuple[List[str], Dict[str, Any]]:
@@ -420,15 +424,15 @@ Return only valid JSON.
             
             if apollo_ids:
                 params['organization_locations'] = apollo_ids
-                logging.info(f"Using LLM-parsed location IDs: {apollo_ids} for '{location_config.raw_location}'")
+                logger.info(f"Using LLM-parsed location IDs: {apollo_ids} for '{location_config.raw_location}'")
             else:
-                logging.warning(f"Could not parse location: {location_config.raw_location}")
-                logging.info(f"Parsing info: {parsed_info}")
+                logger.warning(f"Could not parse location: {location_config.raw_location}")
+                logger.info(f"Parsing info: {parsed_info}")
         
         elif location_config.apollo_location_ids:
             # Use pre-configured Apollo location IDs
             params['organization_locations'] = location_config.apollo_location_ids
-            logging.info(f"Using configured location IDs: {location_config.apollo_location_ids}")
+            logger.info(f"Using configured location IDs: {location_config.apollo_location_ids}")
         
         return params
     

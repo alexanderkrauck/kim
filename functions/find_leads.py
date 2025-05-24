@@ -13,19 +13,8 @@ from firebase_functions import https_fn, options
 from firebase_admin import firestore
 
 # Configure logging for Firebase Functions
-logger = logging.getLogger("firebase_function_logger")
-logger.setLevel(logging.INFO)
-
-# Clear existing handlers to avoid duplicate output in hot reloads
-if logger.hasHandlers():
-    logger.handlers.clear()
-
-# Force output to stdout (not stderr)
-stdout_handler = logging.StreamHandler(stream=sys.stdout)
-stdout_handler.setLevel(logging.INFO)
-stdout_handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
-
-logger.addHandler(stdout_handler)
+from utils.logging_config import get_logger
+logger = get_logger(__file__)
 
 # Configure European region
 EUROPEAN_REGION = options.SupportedRegion.EUROPE_WEST1
@@ -37,7 +26,6 @@ from utils import (
     get_api_keys,
     get_project_settings
 )
-# Simple logging - just use print() which shows up in Firebase logs
 from config_sync import get_config_sync
 from location_processor import location_processor
 

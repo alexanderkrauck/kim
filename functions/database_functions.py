@@ -11,6 +11,10 @@ from firebase_functions import https_fn, options
 # Configure European region
 EUROPEAN_REGION = options.SupportedRegion.EUROPE_WEST1
 
+# Configure logging for Firebase Functions
+from utils.logging_config import get_logger
+logger = get_logger(__file__)
+
 from database_maintenance import (
     DatabaseMaintenanceManager, 
     cleanup_database, 
@@ -37,7 +41,7 @@ def database_cleanup(req: https_fn.CallableRequest) -> Dict[str, Any]:
         if req.data is not None:
             dry_run = req.data.get('dry_run', True)
         
-        logging.info(f"Database cleanup requested (dry_run={dry_run})")
+        logger.info(f"Database cleanup requested (dry_run={dry_run})")
         
         result = cleanup_database(dry_run=dry_run)
         
@@ -47,7 +51,7 @@ def database_cleanup(req: https_fn.CallableRequest) -> Dict[str, Any]:
         }
         
     except Exception as e:
-        logging.error(f"Error in database_cleanup: {str(e)}")
+        logger.error(f"Error in database_cleanup: {str(e)}")
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.INTERNAL,
             message=f"Failed to clean up database: {str(e)}"
@@ -72,7 +76,7 @@ def database_initialize(req: https_fn.CallableRequest) -> Dict[str, Any]:
         if req.data is not None:
             force = req.data.get('force', False)
         
-        logging.info(f"Database initialization requested (force={force})")
+        logger.info(f"Database initialization requested (force={force})")
         
         result = initialize_database(force=force)
         
@@ -82,9 +86,9 @@ def database_initialize(req: https_fn.CallableRequest) -> Dict[str, Any]:
         }
         
     except Exception as e:
-        logging.error(f"Error in database_initialize: {str(e)}")
+        logger.error(f"Error in database_initialize: {str(e)}")
         import traceback
-        logging.error(f"Full traceback: {traceback.format_exc()}")
+        logger.error(f"Full traceback: {traceback.format_exc()}")
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.INTERNAL,
             message=f"Failed to initialize database: {str(e)}"
@@ -100,7 +104,7 @@ def database_health_check(req: https_fn.CallableRequest) -> Dict[str, Any]:
         Dict with health report
     """
     try:
-        logging.info("Database health check requested")
+        logger.info("Database health check requested")
         
         health_report = get_database_health()
         
@@ -110,7 +114,7 @@ def database_health_check(req: https_fn.CallableRequest) -> Dict[str, Any]:
         }
         
     except Exception as e:
-        logging.error(f"Error in database_health_check: {str(e)}")
+        logger.error(f"Error in database_health_check: {str(e)}")
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.INTERNAL,
             message=f"Failed to generate health report: {str(e)}"
@@ -138,7 +142,7 @@ def database_full_maintenance(req: https_fn.CallableRequest) -> Dict[str, Any]:
             cleanup_dry_run = req.data.get('cleanup_dry_run', True)
             force_init = req.data.get('force_init', False)
         
-        logging.info(f"Full database maintenance requested (cleanup_dry_run={cleanup_dry_run}, force_init={force_init})")
+        logger.info(f"Full database maintenance requested (cleanup_dry_run={cleanup_dry_run}, force_init={force_init})")
         
         maintenance_results = {
             'health_check': {},
@@ -152,9 +156,9 @@ def database_full_maintenance(req: https_fn.CallableRequest) -> Dict[str, Any]:
             health_report = get_database_health()
             maintenance_results['health_check'] = health_report
             maintenance_results['completed_steps'].append('health_check')
-            logging.info("Health check completed")
+            logger.info("Health check completed")
         except Exception as e:
-            logging.warning(f"Health check failed: {e}")
+            logger.warning(f"Health check failed: {e}")
             maintenance_results['health_check'] = {'error': str(e)}
         
         # Step 2: Cleanup
@@ -162,9 +166,9 @@ def database_full_maintenance(req: https_fn.CallableRequest) -> Dict[str, Any]:
             cleanup_result = cleanup_database(dry_run=cleanup_dry_run)
             maintenance_results['cleanup'] = cleanup_result
             maintenance_results['completed_steps'].append('cleanup')
-            logging.info(f"Cleanup completed (dry_run={cleanup_dry_run})")
+            logger.info(f"Cleanup completed (dry_run={cleanup_dry_run})")
         except Exception as e:
-            logging.warning(f"Cleanup failed: {e}")
+            logger.warning(f"Cleanup failed: {e}")
             maintenance_results['cleanup'] = {'error': str(e)}
         
         # Step 3: Initialization (if needed)
@@ -178,13 +182,13 @@ def database_full_maintenance(req: https_fn.CallableRequest) -> Dict[str, Any]:
                 init_result = initialize_database(force=force_init)
                 maintenance_results['initialization'] = init_result
                 maintenance_results['completed_steps'].append('initialization')
-                logging.info(f"Initialization completed (force={force_init})")
+                logger.info(f"Initialization completed (force={force_init})")
             else:
                 maintenance_results['initialization'] = {'skipped': 'Configuration already complete'}
                 maintenance_results['completed_steps'].append('initialization_skipped')
-                logging.info("Initialization skipped - configuration already complete")
+                logger.info("Initialization skipped - configuration already complete")
         except Exception as e:
-            logging.warning(f"Initialization failed: {e}")
+            logger.warning(f"Initialization failed: {e}")
             maintenance_results['initialization'] = {'error': str(e)}
         
         return {
@@ -193,7 +197,7 @@ def database_full_maintenance(req: https_fn.CallableRequest) -> Dict[str, Any]:
         }
         
     except Exception as e:
-        logging.error(f"Error in database_full_maintenance: {str(e)}")
+        logger.error(f"Error in database_full_maintenance: {str(e)}")
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.INTERNAL,
             message=f"Failed to perform full maintenance: {str(e)}"
