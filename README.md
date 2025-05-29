@@ -1,285 +1,361 @@
-# 🚀 Outreach Admin Dashboard
+# 🚀 KIM - Lead Generation System
 
-A comprehensive Firebase-hosted admin dashboard for managing automated outreach campaigns with AI-powered email generation.
+A comprehensive AI-powered outreach platform for automated lead discovery, enrichment, and email campaigns.
 
-## ✨ Features
+## ✨ Overview
+
+KIM is a production-ready lead generation system that combines:
+- **AI-Powered Lead Discovery** via Apollo.io integration
+- **Intelligent Lead Enrichment** using Perplexity AI research
+- **Personalized Email Generation** with OpenAI
+- **Automated Email Campaigns** with SMTP delivery
+- **Firebase-Hosted Admin Dashboard** with real-time updates
+
+Perfect for businesses looking to automate their outreach pipeline with AI assistance.
+
+## 🎯 Key Features
+
+### 📊 **Project Management**
+- Create projects with detailed targeting criteria
+- Project-specific email guidelines and AI prompts
+- Lead organization by project with comprehensive filtering
+
+### 🤖 **AI-Powered Lead Processing**
+- **Discovery**: Apollo.io integration with location and role targeting
+- **Enrichment**: Perplexity AI research for company and person insights
+- **Email Generation**: OpenAI-powered personalized outreach and follow-ups
+
+### 📧 **Email Automation**
+- SMTP integration with scheduling and rate limiting
+- Automated follow-up sequences with customizable delays
+- Professional email templates with AI personalization
 
 ### ⚙️ **Configuration Management**
-- **Global API Keys**: OpenAI, Apollo, Apifi, Perplexity integrated into Configuration tab
-- **Secure Storage**: Masked display with show/hide functionality
-- **Database Initialization**: Automatic setup on first login with health monitoring
-- **Firebase Integration**: Encrypted storage in Firestore
+- Unified settings interface for all system configuration
+- API key management with secure storage
+- Global and project-specific prompt customization
 
-### 📁 **Project Management**
-- **Project Creation**: Name, area description, detailed project info
-- **Email Guidelines**: Project-specific email considerations (300 chars)
-- **Follow-up Strategy**: Custom follow-up timing and approach (300 chars)
-- **AI Prompt Overrides**: Project-specific AI instructions or use global defaults
-- **Project Settings**: Comprehensive configuration in dedicated settings view
+### 🛡️ **Security & Reliability**
+- Firebase Authentication with multi-layer protection
+- Firestore database with automated maintenance
+- Health monitoring with proactive issue detection
 
-### 👥 **Lead Management**
-- **Project-Scoped Leads**: All leads belong to specific projects
-- **Rich Data Model**: Email, name, company, status, source, notes, interaction history
-- **Lead Addition**: Simple form with validation
-- **CSV Export**: Complete lead data export with project-specific filenames
-- **Enhanced Table**: Sortable columns, simple/detailed view modes
-- **Status Tracking**: New, emailed, responded, bounced, blacklisted
+## 🏗️ Tech Stack
 
-### 🤖 **AI Prompt Templates**
-- **Global Templates**: Default AI instructions for all projects
-- **Project Overrides**: Custom AI instructions per project
-- **Clear Guidance**: Examples and best practices for writing effective prompts
-- **Smart Defaults**: Projects use global templates unless overridden
+### Frontend
+- **React 18** with TypeScript
+- **Tailwind CSS** for styling
+- **Firebase Hosting** for deployment
 
-### 🚫 **Blacklist Management**
-- **Global Blacklist**: Email addresses blocked across all projects
-- **Easy Management**: Add/remove emails with validation
+### Backend
+- **Firebase Functions** (Python) for business logic
+- **Firestore** for data storage
+- **Firebase Authentication** for security
 
-### ⚙️ **Configuration**
-- **Unified Settings Tab**: All system configuration in one streamlined interface
-- **API Keys**: OpenAI, Apollo, Apifi, Perplexity configuration with secure storage
-- **SMTP Email Settings**: Complete SMTP server configuration for outreach emails
-  - Server settings (host, port, SSL/TLS encryption)
-  - Authentication (username, password)  
-  - Email configuration (from email, from name, reply-to)
-  - Support for major providers (Gmail, Outlook, Yahoo, SendGrid)
-  - **Safety Features**: Confirmation dialogs and change tracking for SMTP settings
-  - **Reset Functionality**: Ability to revert unsaved SMTP changes
-- **Automatic Initialization**: System automatically sets up default configuration on first login
-- **Health Monitoring**: Database health checks with automatic recovery
-- **European Deployment**: Optimized for `europe-west1` region performance
+### Integrations
+- **Apollo.io** - Lead discovery
+- **Perplexity AI** - Lead enrichment
+- **OpenAI** - Email generation
+- **SMTP** - Email delivery
 
-## 🏗️ Architecture
-
-### **Project-Centric Design**
-- All operations are scoped to specific projects
-- Projects contain leads, settings, and AI prompt overrides
-- Clear separation between global settings and project-specific configuration
-
-### **Smart Navigation** (4 streamlined tabs)
-- **Projects Tab**: Create, edit, and manage projects with comprehensive settings
-- **Leads Tab**: Manage leads for selected project with enhanced functionality
-- **Blacklist Tab**: Manage globally blocked email addresses
-- **Configuration Tab**: Unified API keys, SMTP settings, and system configuration
-
-### **Data Flow**
-1. Create projects with detailed configuration
-2. Add leads to specific projects
-3. Configure AI prompts (global or project-specific)
-4. Export lead data for external use
-
-## 🛠️ Tech Stack
-
-- **Frontend**: React 18 + TypeScript
-- **Styling**: Tailwind CSS
-- **Icons**: Heroicons
-- **Backend**: Firebase (Firestore + Authentication + Hosting)
-- **Build Tool**: Create React App
-- **State Management**: React Hooks + Context API
-
-## 🚀 Getting Started
+## 🚀 Quick Start
 
 ### Prerequisites
 - Node.js 16+ and npm
-- Firebase project with Firestore and Authentication enabled
+- Python 3.9+ (for Firebase Functions)
+- Firebase project with services enabled
 
-### Installation
+### 1. Clone & Install
+```bash
+git clone <repository-url>
+cd kim
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd kim
-   ```
+# Install frontend dependencies
+npm install
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Configure Firebase**
-   ```bash
-   # Copy environment template
-   cp env.example .env
-   
-   # Add your Firebase configuration to .env
-   ```
-
-4. **Start development server**
-   ```bash
-   npm start
-   ```
-
-5. **Deploy to Firebase** (optional)
-   ```bash
-   npm run build
-   firebase deploy
-   ```
-
-### Environment Variables
-Create a `.env` file with your Firebase configuration:
+# Install backend dependencies  
+cd functions
+pip install -r requirements.txt
+cd ..
 ```
+
+### 2. Firebase Setup
+```bash
+# Install Firebase CLI
+npm install -g firebase-tools
+
+# Login and select project
+firebase login
+firebase use <your-project-id>
+```
+
+### 3. Environment Configuration
+```bash
+# Copy environment template
+cp env.example .env
+
+# Edit .env with your Firebase configuration
 REACT_APP_FIREBASE_API_KEY=your_api_key
 REACT_APP_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
 REACT_APP_FIREBASE_PROJECT_ID=your_project_id
-REACT_APP_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
-REACT_APP_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-REACT_APP_FIREBASE_APP_ID=your_app_id
+# ... add remaining Firebase config
 ```
 
-## 📊 Data Models
+### 4. Deploy & Initialize
+```bash
+# Deploy Firebase Functions
+firebase deploy --only functions
 
-### Project
-```typescript
-interface Project {
-  id: string;
-  name: string;
-  areaDescription: string;        // Target area specification
-  projectDetails: string;         // Detailed description (5k chars)
-  emailConsiderations: string;    // Email guidelines (300 chars)
-  followupConsiderations: string; // Follow-up strategy (300 chars)
-  createdAt: Date;
-  updatedAt: Date;
-  isActive: boolean;
-  leadCount: number;
-}
+# Start frontend development server
+npm start
+
+# Initialize database (run in browser console after login)
+const functions = firebase.functions();
+await functions.httpsCallable('database_initialize')();
 ```
 
-### Lead
-```typescript
-interface Lead {
-  id: string;
-  email: string;
-  name?: string;
-  company?: string;
-  status: 'new' | 'emailed' | 'responded' | 'bounced' | 'blacklisted';
-  lastContacted: Date | null;
-  followupCount: number;
-  createdAt: Date;
-  projectId: string;
-  interactionSummary: string;
-  emailChain: EmailRecord[];
-  source?: string;
-  notes?: string;
-}
-```
+### 5. Configure API Keys
+1. Open the application and log in
+2. Navigate to **Configuration** tab
+3. Add your API keys:
+   - OpenAI API Key (required)
+   - Apollo.io API Key (required)
+   - Perplexity API Key (optional)
+4. Configure SMTP settings for email delivery
 
-### SMTP Settings
-```typescript
-interface SmtpSettings {
-  host: string;
-  port: number;
-  secure: boolean; // true for 465, false for other ports
-  username: string;
-  password: string;
-  fromEmail: string;
-  fromName: string;
-  replyToEmail?: string;
-}
-```
+## 📋 Usage Guide
 
-## 🎯 Usage Guide
-
-### Creating a Project
-1. Navigate to **Projects** tab
-2. Click **"New Project"**
-3. Fill in project details:
+### Creating Your First Project
+1. Go to **Projects** tab → **New Project**
+2. Fill in project details:
    - **Name**: Descriptive project name
-   - **Area Description**: Target location/specification
-   - **Project Details**: Comprehensive project description
-   - **Email Considerations**: Special email guidelines
-   - **Follow-up Considerations**: Follow-up strategy
-4. Click **"Create Project"**
+   - **Area Description**: Target location/market
+   - **Project Details**: Comprehensive description
+   - **Email Guidelines**: Special considerations for outreach
+3. Configure AI prompts (or use global defaults)
 
-### Managing Project Settings
-1. In **Projects** tab, click **"Edit Project"** on any project
-2. Use the three tabs to configure:
-   - **Project Details**: Basic information
-   - **Email Guidelines**: Email and follow-up considerations
-   - **AI Prompts**: Custom AI instructions or use global defaults
-3. Save changes in each section
+### Finding Leads
+1. Select your project → **View Leads**
+2. Click **Add Lead** or use bulk import
+3. For automated discovery:
+   ```javascript
+   // Via Firebase Functions
+   const result = await functions.httpsCallable('find_leads')({
+     project_id: 'your_project_id',
+     num_leads: 25,
+     auto_enrich: true
+   });
+   ```
 
-### Adding Leads
-1. Click **"View Leads"** on a project or select project and go to **Leads** tab
-2. Click **"Add Lead"**
-3. Fill in lead information (email required)
-4. Lead is automatically associated with the selected project
-
-### Configuring AI Prompts
-1. **Global Templates**: Go to **Prompts** tab to set default AI instructions
-2. **Project Overrides**: In project settings, go to **AI Prompts** tab to customize
+### Email Campaigns
+1. Select leads in **Leads** tab
+2. Generate personalized emails:
+   ```javascript
+   await functions.httpsCallable('generate_emails')({
+     project_id: 'project_id',
+     lead_ids: ['lead1', 'lead2'],
+     email_type: 'outreach'
+   });
+   ```
+3. Send emails with scheduling:
+   ```javascript
+   await functions.httpsCallable('contact_leads')({
+     project_id: 'project_id', 
+     lead_ids: ['lead1', 'lead2'],
+     dry_run: false
+   });
+   ```
 
 ## 🔧 Development
 
-### Available Scripts
-- `npm start` - Start development server
-- `npm run build` - Build for production
-- `npm test` - Run tests
-- `npm run eject` - Eject from Create React App
+### Frontend Development
+```bash
+npm start              # Development server
+npm run build          # Production build
+npm test               # Run tests
+```
 
-### Firebase Commands
-- `firebase serve` - Serve locally
+### Backend Development
+```bash
+cd functions
+
+# Local testing
+python test_apis.py              # Test API connections
+python run_database_maintenance.py --action health  # Health check
+
+# Deploy functions
+firebase deploy --only functions
+```
+
+### Available Scripts
+- `npm start` - Start React development server
+- `npm run build` - Build for production
+- `firebase serve` - Serve locally with Firebase
 - `firebase deploy` - Deploy to production
-- `firebase deploy --only firestore:indexes` - Deploy database indexes
+
+## 📊 API Reference
+
+### Core Functions
+
+#### Lead Management
+```javascript
+// Find leads using Apollo.io
+await functions.httpsCallable('find_leads')({
+  project_id: string,
+  num_leads: number,
+  auto_enrich?: boolean
+});
+
+// Enrich leads with Perplexity AI
+await functions.httpsCallable('enrich_leads')({
+  project_id: string,
+  lead_ids: string[]
+});
+```
+
+#### Email Operations
+```javascript
+// Generate personalized emails
+await functions.httpsCallable('generate_emails')({
+  project_id: string,
+  lead_ids: string[],
+  email_type: 'outreach' | 'followup'
+});
+
+// Send emails
+await functions.httpsCallable('contact_leads')({
+  project_id: string,
+  lead_ids: string[],
+  dry_run?: boolean
+});
+```
+
+#### Configuration
+```javascript
+// Update global configuration
+await functions.httpsCallable('update_global_config')(configData);
+
+// Update project-specific configuration  
+await functions.httpsCallable('update_project_config')({
+  project_id: string,
+  config: object
+});
+```
+
+### Database Maintenance
+```javascript
+// Health check
+await functions.httpsCallable('database_health_check')();
+
+// Initialize database
+await functions.httpsCallable('database_initialize')();
+
+// Cleanup old data
+await functions.httpsCallable('database_cleanup')({ dry_run: true });
+```
 
 ## 🛡️ Security
 
-### **Multi-Layer Authentication Protection**
-- **Frontend Route Protection**: App component prevents dashboard access without authentication
-- **Component-Level Checks**: All sensitive components verify authentication before data access
-- **Database Security**: Firestore rules require authentication for all read/write operations
-- **Session Management**: Firebase Authentication handles secure session management
+### Authentication
+- Firebase Authentication protects all routes
+- Database rules require authentication for all operations
+- Component-level authentication checks
 
-### **Data Access Security**
-- **API Keys**: Only accessible to authenticated users with explicit checks
-- **SMTP Settings**: Protected by authentication verification and confirmation dialogs
-- **Projects & Leads**: All project data requires valid authentication
-- **Global Settings**: Timing and prompt settings protected by authentication
-- **Blacklist Management**: Global blacklist access requires authentication
+### Data Protection
+- API keys stored securely in Firestore
+- SMTP credentials encrypted
+- No sensitive data exposed in client-side code
 
-### **Security Features**
-- **Authentication Required**: All operations require user authentication
-- **Firestore Rules**: Secure database access with proper rules (`request.auth != null`)
-- **API Key Protection**: Sensitive keys are masked in UI and stored securely
-- **Input Validation**: All forms include proper validation
-- **Error Handling**: No sensitive data exposed in error messages
-- **Session Persistence**: Secure authentication state across page refreshes
+### Best Practices
+- All database operations require valid auth tokens
+- Input validation on all functions
+- Rate limiting for external API calls
+
+## 🏥 Maintenance
+
+### Database Health
+```bash
+# Check database health
+python functions/run_database_maintenance.py --action health
+
+# Clean up old patterns (dry run)
+python functions/run_database_maintenance.py --action cleanup --dry-run
+
+# Initialize default configuration
+python functions/run_database_maintenance.py --action init
+```
+
+### Monitoring
+- Automated health checks available
+- Database maintenance functions
+- Comprehensive logging throughout
+
+## 📁 Project Structure
+
+```
+kim/
+├── src/                    # React frontend
+│   ├── components/         # React components
+│   ├── contexts/          # React contexts
+│   ├── hooks/             # Custom hooks
+│   └── types/             # TypeScript types
+├── functions/              # Firebase Functions (Python)
+│   ├── main.py            # Function exports
+│   ├── config_model.py    # Configuration schemas
+│   ├── find_leads.py      # Lead discovery
+│   ├── enrich_leads.py    # Lead enrichment
+│   ├── email_generation.py # Email generation
+│   ├── contact_leads.py   # Email sending
+│   └── utils/             # Utility modules
+├── public/                # Static assets
+└── build/                 # Production build
+```
+
+## 🚢 Deployment
+
+### Production Deployment
+```bash
+# Build and deploy everything
+npm run build
+firebase deploy
+
+# Deploy only functions
+firebase deploy --only functions
+
+# Deploy only hosting
+firebase deploy --only hosting
+```
+
+### Environment Variables
+Required for production:
+- Firebase configuration (via .env)
+- API keys (configured in app)
+- SMTP settings (configured in app)
+
+## 📞 Support & Contributing
+
+### Getting Help
+1. Check the [functions README](functions/README.md) for detailed backend documentation
+2. Check the [database maintenance guide](functions/DATABASE_MAINTENANCE_GUIDE.md) for operational procedures
+3. Review Firebase console logs for debugging
+
+### Contributing
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes with tests
+4. Submit a pull request
 
 ## 📝 License
 
-This project is licensed under the MIT License.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 🤝 Contributing
+## 🎉 What's Included
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+✅ **Complete Lead Generation Pipeline** - Discovery to delivery  
+✅ **AI-Powered Personalization** - OpenAI and Perplexity integration  
+✅ **Production-Ready** - Firebase hosting with authentication  
+✅ **Automated Maintenance** - Database health monitoring and cleanup  
+✅ **Comprehensive Documentation** - Everything you need to get started  
+✅ **Modern Tech Stack** - React, TypeScript, Firebase, Python  
 
-## 📞 Support
-
-For questions or issues, please create an issue in the repository or contact the development team.
-
----
-
-## 🎉 Recent Updates
-
-### UI/UX Improvements
-- ✅ Streamlined navigation from 5 to 4 tabs for better user experience
-- ✅ Merged API Keys into unified Configuration tab
-- ✅ Fixed TypeScript compilation issues and ESLint warnings
-- ✅ Enhanced lead management with improved filtering and display
-
-### System Enhancements  
-- ✅ Automatic database initialization on first login
-- ✅ European region deployment (`europe-west1`) for optimal performance
-- ✅ Comprehensive database maintenance and health monitoring
-- ✅ 24 Firebase Functions deployed for complete functionality
-- ✅ Background job infrastructure ready for automation
-
-### Current Status
-**Production-ready lead generation system** with clean architecture, automated maintenance, and optimal user experience! 🚀
-
----
-
-**Built with ❤️ for efficient outreach campaign management** 
+Built with ❤️ for efficient, AI-powered outreach automation. 
