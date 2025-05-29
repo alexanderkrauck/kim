@@ -1,4 +1,4 @@
-# 🚀 KIM - Lead Generation System
+# 🚀 KIM - Marketing System
 
 A comprehensive AI-powered outreach platform for automated lead discovery, enrichment, and email campaigns.
 
@@ -347,7 +347,9 @@ Required for production:
 
 ## 📝 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under a Custom License - see the [LICENSE](LICENSE) file for details.
+
+**Summary**: Personal and internal business use permitted. Commercial use, resale, or redistribution requires explicit written permission from Alexander Krauck.
 
 ## 🎉 What's Included
 
